@@ -17,6 +17,9 @@ export const viewport = {
   themeColor: '#0d9488',
 }
 
+import { LanguageProvider } from '@/components/LanguageContext'
+import { UserProvider } from '@/components/UserContext'
+
 export default function RootLayout({ children }) {
   return (
     <html lang="id">
@@ -25,7 +28,11 @@ export default function RootLayout({ children }) {
         <meta name="application-name" content="Cash Book" />
       </head>
       <body className={inter.className}>
-        {children}
+        <LanguageProvider>
+          <UserProvider>
+            {children}
+          </UserProvider>
+        </LanguageProvider>
       </body>
     </html>
   )

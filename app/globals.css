@@ -316,14 +316,16 @@ img { max-width: 100%; display: block; }
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
   z-index: 100;
-  padding: 0 8px;
+  padding: 0; /* Removed padding to ensure true centering */
 }
 
 .bottom-nav-items {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: center;
+  justify-items: center; /* Center each item in its grid cell */
   height: 100%;
+  width: 100%;
 }
 
 .bottom-nav-item {

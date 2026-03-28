@@ -2,8 +2,10 @@
 // components/CategoryBadge.jsx - Badge kategori dengan emoji dan warna
 
 import { getCategoryInfo } from '@/lib/constants'
+import { useLanguage } from '@/components/LanguageContext'
 
 export default function CategoryBadge({ category, size = 'normal' }) {
+  const { t } = useLanguage()
   const info = getCategoryInfo(category)
 
   const style = {
@@ -16,7 +18,7 @@ export default function CategoryBadge({ category, size = 'normal' }) {
   return (
     <span className="cat-badge" style={style}>
       <span>{info.emoji}</span>
-      <span>{info.label}</span>
+      <span>{t(info.labelKey)}</span>
     </span>
   )
 }

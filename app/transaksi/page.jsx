@@ -3,6 +3,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import AppShell from '@/components/AppShell'
+import { useUser } from '@/components/UserContext'
+import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
 import { formatRupiah, formatDate, formatDateInput } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo, getInitials } from '@/lib/constants'
@@ -10,6 +12,8 @@ import { Search, Download, Edit2, Trash2, X, ChevronLeft, ChevronRight } from 'l
 import Link from 'next/link'
 
 export default function TransaksiPage() {
+  const { t, language } = useLanguage()
+  const { user } = useUser()
   const [transactions, setTransactions] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -170,15 +174,15 @@ export default function TransaksiPage() {
       <div className="page-container">
         <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1>Riwayat Transaksi 📋</h1>
-            <p>Semua catatan pengeluaran keluarga</p>
+            <h1>{t('history')} 📋</h1>
+            <p>{t('digital_cashbook')}</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-ghost btn-sm" onClick={handleExport}>
-              <Download size={15} /> Export CSV
+              <Download size={15} /> {t('actions')} CSV
             </button>
             <Link href="/transaksi/baru" className="btn btn-primary btn-sm">
-              + Catat Baru
+              + {t('add_expense')}
             </Link>
           </div>
         </div>
@@ -193,7 +197,7 @@ export default function TransaksiPage() {
                 <input
                   type="text"
                   className="search-input"
-                  placeholder="Cari item atau catatan..."
+                  placeholder={t('search_placeholder')}
                   value={search}
                   onChange={e => { setSearch(e.target.value); setPage(1) }}
                 />
@@ -204,9 +208,9 @@ export default function TransaksiPage() {
                 onChange={e => { setCategory(e.target.value); setPage(1) }}
                 style={{ flex: 1, minWidth: 160 }}
               >
-                <option value="">Semua Kategori</option>
+                <option value="">{t('all_categories')}</option>
                 {CATEGORIES.map(c => (
-                  <option key={c.id} value={c.label}>{c.emoji} {c.label}</option>
+                  <option key={c.id} value={c.id}>{c.emoji} {t(c.labelKey)}</option>
                 ))}
               </select>
               <select
@@ -215,7 +219,7 @@ export default function TransaksiPage() {
                 onChange={e => { setMemberId(e.target.value); setPage(1) }}
                 style={{ flex: 1, minWidth: 140 }}
               >
-                <option value="">Semua Anggota</option>
+                <option value="">{t('all_members')}</option>
                 {members.map(m => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
@@ -241,10 +245,10 @@ export default function TransaksiPage() {
               />
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {[
-                  { id: '7days', label: '7 Hari' },
-                  { id: '30days', label: '30 Hari' },
-                  { id: 'this_month', label: 'Bulan Ini' },
-                  { id: 'last_month', label: 'Bulan Lalu' },
+                  { id: '7days', label: t('d_7days') },
+                  { id: '30days', label: t('d_30days') },
+                  { id: 'this_month', label: t('d_this_month') },
+                  { id: 'last_month', label: t('d_last_month') },
                 ].map(p => (
                   <button
                     key={p.id}
@@ -256,7 +260,7 @@ export default function TransaksiPage() {
                 ))}
                 {(search || category || memberId || startDate || endDate) && (
                   <button className="btn btn-ghost btn-sm" onClick={resetFilters} style={{ color: 'var(--color-danger)' }}>
-                    <X size={13} /> Reset
+                    <X size={13} /> {t('cancel')}
                   </button>
                 )}
               </div>
@@ -266,7 +270,7 @@ export default function TransaksiPage() {
             {(startDate || endDate || search || category || memberId) && (
               <div style={{ width: '100%', padding: '10px 0 0', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Menampilkan {transactions.length} dari {total} transaksi
+                  {t('view_all')} {transactions.length} / {total} {t('history')}
                 </span>
                 <span style={{ fontWeight: 700, color: '#ef4444' }}>
                   Total: {formatRupiah(totalFiltered)}
@@ -277,12 +281,12 @@ export default function TransaksiPage() {
 
           {/* Table */}
           {loading ? (
-            <div className="loading-container"><div className="spinner" /><p>Memuat...</p></div>
+            <div className="loading-container"><div className="spinner" /><p>{t('loading')}</p></div>
           ) : transactions.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📭</div>
-              <h3>Tidak ada transaksi</h3>
-              <p>Coba ubah filter atau kata kunci pencarian</p>
+              <h3>{t('no_transactions')}</h3>
+              <p>{t('digital_cashbook')}</p>
             </div>
           ) : (
             <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
@@ -290,15 +294,15 @@ export default function TransaksiPage() {
                 <thead>
                   <tr>
                     <th className="sortable" onClick={() => handleSort('transactionDate')}>
-                      Tanggal {sortBy === 'transactionDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {t('date')} {sortBy === 'transactionDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
-                    <th>Item / Keperluan</th>
-                    <th className="hide-on-mobile">Kategori</th>
+                    <th>{t('item_name')}</th>
+                    <th className="hide-on-mobile">{t('category')}</th>
                     <th className="sortable" onClick={() => handleSort('amount')}>
-                      Nominal {sortBy === 'amount' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      {t('amount')} {sortBy === 'amount' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
-                    <th className="hide-on-mobile">Dicatat Oleh</th>
-                    <th>Aksi</th>
+                    <th className="hide-on-mobile">{t('member_name')}</th>
+                    <th>{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -312,7 +316,7 @@ export default function TransaksiPage() {
                     return (
                       <tr key={t.id}>
                         <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                          {formatDate(t.transactionDate)}
+                          {formatDate(t.transactionDate, language)}
                         </td>
                         <td>
                           <div style={{ fontWeight: 500 }}>{t.itemName}</div>
@@ -368,7 +372,7 @@ export default function TransaksiPage() {
           {totalPages > 1 && (
             <div className="pagination">
               <span className="pagination-info">
-                Halaman {page} dari {totalPages} ({total} transaksi)
+                {t('history')} {page} / {totalPages} ({total} {t('history').toLowerCase()})
               </span>
               <div className="pagination-controls">
                 <button
@@ -408,12 +412,12 @@ export default function TransaksiPage() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h3 className="modal-title">Edit Transaksi</h3>
+              <h3 className="modal-title">{t('edit')}</h3>
               <button className="btn-icon" onClick={() => setEditTx(null)}>✕</button>
             </div>
             <div className="modal-body" style={{ display: 'grid', gap: 16 }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Nama Item</label>
+                <label className="form-label">{t('item_name')}</label>
                 <input
                   type="text"
                   className="form-input"
@@ -422,7 +426,7 @@ export default function TransaksiPage() {
                 />
               </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Jumlah (Rp)</label>
+                <label className="form-label">{t('amount')} (Rp)</label>
                 <input
                   type="number"
                   className="form-input"
@@ -431,19 +435,19 @@ export default function TransaksiPage() {
                 />
               </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Kategori</label>
+                <label className="form-label">{t('category')}</label>
                 <select
                   className="form-select"
                   value={editForm.category}
                   onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
                 >
                   {CATEGORIES.map(c => (
-                    <option key={c.id} value={c.label}>{c.emoji} {c.label}</option>
+                    <option key={c.id} value={c.id}>{c.emoji} {t(c.labelKey)}</option>
                   ))}
                 </select>
               </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Tanggal</label>
+                <label className="form-label">{t('date')}</label>
                 <input
                   type="date"
                   className="form-input"
@@ -452,7 +456,7 @@ export default function TransaksiPage() {
                 />
               </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Catatan</label>
+                <label className="form-label">{t('notes')}</label>
                 <textarea
                   className="form-textarea"
                   value={editForm.notes}
@@ -462,9 +466,9 @@ export default function TransaksiPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setEditTx(null)}>Batal</button>
+              <button className="btn btn-secondary" onClick={() => setEditTx(null)}>{t('cancel')}</button>
               <button className="btn btn-primary" onClick={handleEditSave} disabled={editLoading}>
-                {editLoading ? 'Menyimpan...' : '✅ Simpan'}
+                {editLoading ? t('loading') : `✅ ${t('save')}`}
               </button>
             </div>
           </div>
@@ -476,12 +480,12 @@ export default function TransaksiPage() {
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h3 className="modal-title">Hapus Transaksi</h3>
+              <h3 className="modal-title">{t('delete')}</h3>
               <button className="btn-icon" onClick={() => setDeleteTx(null)}>✕</button>
             </div>
             <div className="modal-body">
               <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Yakin ingin menghapus transaksi ini? Tindakan ini tidak bisa dibatalkan.
+                {t('no_transactions')}?
               </p>
               <div style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 14 }}>
                 <div style={{ fontWeight: 600 }}>{deleteTx.itemName}</div>
@@ -491,9 +495,9 @@ export default function TransaksiPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setDeleteTx(null)}>Batal</button>
+              <button className="btn btn-secondary" onClick={() => setDeleteTx(null)}>{t('cancel')}</button>
               <button className="btn btn-danger" onClick={handleDelete} disabled={deleteLoading}>
-                {deleteLoading ? 'Menghapus...' : '🗑️ Hapus'}
+                {deleteLoading ? t('loading') : `🗑️ ${t('delete')}`}
               </button>
             </div>
           </div>

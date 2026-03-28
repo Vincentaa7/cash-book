@@ -4,13 +4,17 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/AppShell'
+import { useUser } from '@/components/UserContext'
+import { useLanguage } from '@/components/LanguageContext'
 import { CATEGORIES } from '@/lib/constants'
-import { formatRupiah, formatNumber, formatDateInput, getBudgetStatusColor } from '@/lib/format'
+import { formatRupiah, formatNumber, formatDateInput } from '@/lib/format'
 import { AlertCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 export default function NewTransactionPage() {
   const router = useRouter()
+  const { t } = useLanguage()
+  const { user } = useUser()
 
   const now = new Date()
   const [form, setForm] = useState({
@@ -52,10 +56,10 @@ export default function NewTransactionPage() {
 
   function validate() {
     const newErrors = {}
-    if (!form.itemName.trim()) newErrors.itemName = 'Nama item wajib diisi'
-    if (!form.amount || parseInt(form.amount) <= 0) newErrors.amount = 'Jumlah harus lebih dari 0'
-    if (!form.category) newErrors.category = 'Kategori wajib dipilih'
-    if (!form.transactionDate) newErrors.transactionDate = 'Tanggal wajib diisi'
+    if (!form.itemName.trim()) newErrors.itemName = t('required_field')
+    if (!form.amount || parseInt(form.amount) <= 0) newErrors.amount = t('required_field')
+    if (!form.category) newErrors.category = t('required_field')
+    if (!form.transactionDate) newErrors.transactionDate = t('required_field')
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -86,10 +90,10 @@ export default function NewTransactionPage() {
         }, 1800)
       } else {
         const data = await res.json()
-        setErrors({ submit: data.error || 'Gagal menyimpan transaksi' })
+        setErrors({ submit: data.error || t('connection_error') })
       }
     } catch {
-      setErrors({ submit: 'Koneksi gagal. Coba lagi.' })
+      setErrors({ submit: t('connection_error') })
     } finally {
       setLoading(false)
     }
@@ -108,8 +112,8 @@ export default function NewTransactionPage() {
             justifyContent: 'center', minHeight: '60vh', textAlign: 'center',
           }}>
             <div style={{ fontSize: '4rem', marginBottom: 16 }}>✅</div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 8 }}>Transaksi Tersimpan!</h2>
-            <p style={{ color: 'var(--text-muted)' }}>Pengeluaran berhasil dicatat. Mengalihkan ke riwayat...</p>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 8 }}>{t('save')} {t('reports')}!</h2>
+            <p style={{ color: 'var(--text-muted)' }}>{t('digital_cashbook')}</p>
           </div>
         </div>
       </AppShell>
@@ -125,8 +129,8 @@ export default function NewTransactionPage() {
               <ArrowLeft size={20} />
             </Link>
             <div>
-              <h1>Catat Pengeluaran 📝</h1>
-              <p>Tambahkan pengeluaran baru ke buku kas</p>
+              <h1>{t('add_expense')} 📝</h1>
+              <p>{t('digital_cashbook')}</p>
             </div>
           </div>
         </div>
@@ -137,8 +141,8 @@ export default function NewTransactionPage() {
             <div className={`alert ${remaining <= 0 ? 'alert-danger' : remaining / budget.amount < 0.2 ? 'alert-warning' : 'alert-info'}`} style={{ marginBottom: 20 }}>
               <span>💰</span>
               <span>
-                Sisa kas bulan ini: <strong>{formatRupiah(remaining)}</strong>
-                {remaining <= 0 && ' — Kas sudah habis!'}
+                {t('total_expense')}: <strong>{formatRupiah(remaining)}</strong>
+                {remaining <= 0 && ` — ${t('no_transactions')}`}
               </span>
             </div>
           )}
@@ -156,13 +160,13 @@ export default function NewTransactionPage() {
                 {/* Nama item */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="tx-item">
-                    Nama Item / Keperluan <span className="required">*</span>
+                    {t('item_name')} <span className="required">*</span>
                   </label>
                   <input
                     id="tx-item"
                     type="text"
                     className={`form-input ${errors.itemName ? 'error' : ''}`}
-                    placeholder="Contoh: Beli beras 5kg, Bayar listrik..."
+                    placeholder={t('search_placeholder')}
                     value={form.itemName}
                     onChange={e => {
                       setForm(prev => ({ ...prev, itemName: e.target.value }))
@@ -176,7 +180,7 @@ export default function NewTransactionPage() {
                 {/* Jumlah */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="tx-amount">
-                    Jumlah (Rp) <span className="required">*</span>
+                    {t('amount')} (Rp) <span className="required">*</span>
                   </label>
                   <div style={{ position: 'relative' }}>
                     <div style={{
@@ -198,7 +202,7 @@ export default function NewTransactionPage() {
                   {willExceed && (
                     <div className="form-error" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <AlertCircle size={13} />
-                      Melebihi sisa kas ({formatRupiah(remaining)})! Yakin ingin melanjutkan?
+                      {t('no_transactions')} ({formatRupiah(remaining)})!
                     </div>
                   )}
                 </div>
@@ -206,7 +210,7 @@ export default function NewTransactionPage() {
                 {/* Kategori */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="tx-category">
-                    Kategori <span className="required">*</span>
+                    {t('category')} <span className="required">*</span>
                   </label>
                   <select
                     id="tx-category"
@@ -217,10 +221,10 @@ export default function NewTransactionPage() {
                       if (errors.category) setErrors(prev => ({ ...prev, category: '' }))
                     }}
                   >
-                    <option value="">-- Pilih kategori --</option>
+                    <option value="">-- {t('all_categories')} --</option>
                     {CATEGORIES.map(c => (
-                      <option key={c.id} value={c.label}>
-                        {c.emoji} {c.label}
+                      <option key={c.id} value={c.id}>
+                        {c.emoji} {t(c.labelKey)}
                       </option>
                     ))}
                   </select>
@@ -230,7 +234,7 @@ export default function NewTransactionPage() {
                 {/* Tanggal */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="tx-date">
-                    Tanggal Transaksi <span className="required">*</span>
+                    {t('date')} <span className="required">*</span>
                   </label>
                   <input
                     id="tx-date"
@@ -249,12 +253,12 @@ export default function NewTransactionPage() {
                 {/* Catatan */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="tx-notes">
-                    Catatan Tambahan <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opsional)</span>
+                    {t('notes')} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({t('cancel').toLowerCase()})</span>
                   </label>
                   <textarea
                     id="tx-notes"
                     className="form-textarea"
-                    placeholder="Catatan tambahan jika ada..."
+                    placeholder={t('search_placeholder')}
                     value={form.notes}
                     onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
                     rows={3}
@@ -269,10 +273,10 @@ export default function NewTransactionPage() {
                   {loading ? (
                     <>
                       <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      Menyimpan...
+                      {t('loading')}
                     </>
                   ) : (
-                    '💾 Simpan Pengeluaran'
+                    `💾 ${t('save')} ${t('add_expense')}`
                   )}
                 </button>
               </form>
@@ -285,27 +289,27 @@ export default function NewTransactionPage() {
           <div className="modal-overlay">
             <div className="modal">
               <div className="modal-header">
-                <h3 className="modal-title">Konfirmasi Transaksi</h3>
+                <h3 className="modal-title">{t('edit')}</h3>
                 <button className="btn-icon" onClick={() => setShowConfirm(false)}>✕</button>
               </div>
               <div className="modal-body">
-                <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>Apakah data pengeluaran sudah benar?</p>
+                <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>{t('system_menu')}</p>
                 <div style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 16 }}>
                   <div style={{ display: 'grid', gap: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Item</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{t('item_name')}</span>
                       <span style={{ fontWeight: 600 }}>{form.itemName}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Jumlah</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{t('amount')}</span>
                       <span style={{ fontWeight: 700, color: '#ef4444', fontSize: '1.1rem' }}>{formatRupiah(parseInt(form.amount))}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Kategori</span>
-                      <span>{form.category}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{t('category')}</span>
+                      <span>{t(CATEGORIES.find(c => c.id === form.category)?.labelKey)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Tanggal</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{t('date')}</span>
                       <span>{form.transactionDate}</span>
                     </div>
                   </div>
@@ -313,14 +317,14 @@ export default function NewTransactionPage() {
                 {willExceed && (
                   <div className="alert alert-warning" style={{ marginTop: 16 }}>
                     <AlertCircle size={16} />
-                    <span>Pengeluaran ini melebihi sisa kas!</span>
+                    <span>{t('no_transactions')}</span>
                   </div>
                 )}
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowConfirm(false)}>Batal</button>
+                <button className="btn btn-secondary" onClick={() => setShowConfirm(false)}>{t('cancel')}</button>
                 <button className="btn btn-primary" onClick={handleConfirm} id="confirm-submit">
-                  ✅ Ya, Simpan
+                  ✅ {t('save')}
                 </button>
               </div>
             </div>

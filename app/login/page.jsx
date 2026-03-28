@@ -2,7 +2,10 @@
 // app/login/page.jsx - Halaman Login
 
 import { useState, useEffect } from 'react'
+import { useLanguage } from '@/components/LanguageContext'
+
 export default function LoginPage() {
+  const { t } = useLanguage()
   const [name, setName] = useState('')
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
@@ -20,11 +23,11 @@ export default function LoginPage() {
     setError('')
 
     if (!name.trim()) {
-      setError('Nama harus diisi')
+      setError(t('required_field'))
       return
     }
     if (!pin) {
-      setError('PIN harus diisi')
+      setError(t('required_field'))
       return
     }
 
@@ -41,10 +44,10 @@ export default function LoginPage() {
       if (res.ok) {
         window.location.href = '/dashboard'
       } else {
-        setError(data.error || 'Login gagal')
+        setError(data.error || t('connection_error'))
       }
     } catch {
-      setError('Koneksi gagal. Periksa koneksi internet Anda.')
+      setError(t('connection_error'))
     } finally {
       setLoading(false)
     }
@@ -61,7 +64,7 @@ export default function LoginPage() {
         <div className="login-logo">
           <div className="login-logo-icon">💰</div>
           <h1 className="login-title">Cash Book</h1>
-          <p className="login-subtitle">Buku Keuangan Keluarga Digital</p>
+          <p className="login-subtitle">{t('digital_cashbook')}</p>
         </div>
 
         {/* Error */}
@@ -76,13 +79,13 @@ export default function LoginPage() {
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label className="form-label" htmlFor="login-name">
-              Nama Anggota
+              {t('member_name')}
             </label>
             <input
               id="login-name"
               type="text"
               className="form-input"
-              placeholder="Contoh: Ayah, Ibu, Anak..."
+              placeholder={t('search_placeholder')}
               value={name}
               onChange={e => setName(e.target.value)}
               autoFocus
@@ -92,14 +95,14 @@ export default function LoginPage() {
 
           <div className="form-group">
             <label className="form-label" htmlFor="login-pin">
-              PIN Keluarga
+              PIN {t('settings')}
             </label>
             <div style={{ position: 'relative' }}>
               <input
                 id="login-pin"
                 type={showPin ? 'text' : 'password'}
                 className="form-input"
-                placeholder="Masukkan PIN"
+                placeholder={t('search_placeholder')}
                 value={pin}
                 onChange={e => setPin(e.target.value)}
                 autoComplete="current-password"
@@ -141,16 +144,16 @@ export default function LoginPage() {
                   borderRadius: '50%',
                   animation: 'spin 0.8s linear infinite',
                 }} />
-                Masuk...
+                {t('loading')}
               </>
             ) : (
-              <> Masuk ke Cash Book</>
+              <> {t('login_button')}</>
             )}
           </button>
         </form>
 
         <p style={{ textAlign: 'center', marginTop: 24, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Hanya anggota keluarga yang terdaftar yang bisa masuk.
+          {t('digital_cashbook')}
         </p>
       </div>
     </div>

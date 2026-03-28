@@ -3,6 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import AppShell from '@/components/AppShell'
+import { useUser } from '@/components/UserContext'
+import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
 import { formatRupiah, formatDate, formatMonthYear, getMonthName, calcPercentage, getBudgetStatusColor, MONTH_NAMES } from '@/lib/format'
 import { getCategoryInfo } from '@/lib/constants'
@@ -14,6 +16,8 @@ import { TrendingUp, ArrowRight, AlertTriangle, Info } from 'lucide-react'
 import Link from 'next/link'
 
 export default function DashboardPage() {
+  const { t, language } = useLanguage()
+  const { user } = useUser()
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
@@ -47,7 +51,7 @@ export default function DashboardPage() {
     if (active && payload?.length) {
       return (
         <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '8px 14px', fontSize: 13 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Tanggal {label}</div>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>{t('date')} {label}</div>
           <div style={{ color: 'var(--color-primary-600)' }}>{formatRupiah(payload[0].value)}</div>
         </div>
       )
@@ -59,9 +63,9 @@ export default function DashboardPage() {
     if (active && payload?.length) {
       return (
         <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '8px 14px', fontSize: 13 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>{getMonthName(label)} {payload[0]?.payload?.year}</div>
-          <div style={{ color: '#ef4444' }}>Pengeluaran: {formatRupiah(payload[0]?.value || 0)}</div>
-          {payload[1] && <div style={{ color: '#10b981' }}>Kas: {formatRupiah(payload[1]?.value || 0)}</div>}
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>{getMonthName(label, language)} {payload[0]?.payload?.year}</div>
+          <div style={{ color: '#ef4444' }}>{t('expense')}: {formatRupiah(payload[0]?.value || 0)}</div>
+          {payload[1] && <div style={{ color: '#10b981' }}>{t('total_budget').split(' ')[1]}: {formatRupiah(payload[1]?.value || 0)}</div>}
         </div>
       )
     }
@@ -74,8 +78,8 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1>Dashboard 📊</h1>
-            <p>Ringkasan keuangan keluarga bulan ini</p>
+            <h1>{t('dashboard')} 📊</h1>
+            <p>{t('digital_cashbook')}</p>
           </div>
 
           {/* Month selector */}
@@ -86,7 +90,7 @@ export default function DashboardPage() {
               onChange={e => setMonth(parseInt(e.target.value))}
               style={{ width: 130, padding: '8px 12px' }}
             >
-              {MONTH_NAMES.map((m, i) => (
+              {MONTH_NAMES[language]?.map((m, i) => (
                 <option key={i} value={i + 1}>{m}</option>
               ))}
             </select>
@@ -106,7 +110,7 @@ export default function DashboardPage() {
         {loading ? (
           <div className="loading-container">
             <div className="spinner" />
-            <p>Memuat data...</p>
+            <p>{t('loading')}</p>
           </div>
         ) : (
           <>
@@ -115,9 +119,9 @@ export default function DashboardPage() {
               <div className="alert alert-info" style={{ marginBottom: 24 }}>
                 <Info size={16} />
                 <span>
-                  Kas bulan {formatMonthYear(month, year)} belum ditetapkan.{' '}
+                  {t('current_month_limit')} {formatMonthYear(month, year, language)} {t('set_budget_first')}.{' '}
                   <Link href="/pengaturan" style={{ fontWeight: 600, color: 'inherit', textDecoration: 'underline' }}>
-                    Atur sekarang →
+                    {t('settings')} →
                   </Link>
                 </span>
               </div>
@@ -136,7 +140,7 @@ export default function DashboardPage() {
               <div className="alert alert-warning" style={{ marginBottom: 24 }}>
                 <AlertTriangle size={16} />
                 <span>
-                  Sisa kas tinggal {pct < 100 ? 100 - pct : 0}% dari total — kurang dari 20%! Harap bijak berbelanja.
+                  {t('expense')} {pct < 100 ? 100 - pct : 0}% {t('expense_ratio')} — {t('highest_expense')}!
                 </span>
               </div>
             )}
@@ -145,16 +149,16 @@ export default function DashboardPage() {
             <div className="summary-grid fade-in-up">
               <div className="summary-card teal">
                 <div className="summary-card-icon" style={{ background: '#ccfbf1' }}>💵</div>
-                <div className="summary-card-label">Total Kas Bulan Ini</div>
+                <div className="summary-card-label">{t('total_budget')}</div>
                 <div className="summary-card-value">{formatRupiah(data?.summary.totalBudget || 0)}</div>
-                <div className="summary-card-sub">{formatMonthYear(month, year)}</div>
+                <div className="summary-card-sub">{formatMonthYear(month, year, language)}</div>
               </div>
 
               <div className="summary-card red">
                 <div className="summary-card-icon" style={{ background: '#fee2e2' }}>💸</div>
-                <div className="summary-card-label">Total Pengeluaran</div>
+                <div className="summary-card-label">{t('total_expense')}</div>
                 <div className="summary-card-value">{formatRupiah(data?.summary.totalExpense || 0)}</div>
-                <div className="summary-card-sub">{data?.summary.budgetPercentUsed || 0}% dari kas</div>
+                <div className="summary-card-sub">{data?.summary.budgetPercentUsed || 0}% {t('expense_ratio')}</div>
                 {data?.summary.totalBudget > 0 && (
                   <div className="progress-bar">
                     <div
@@ -169,22 +173,22 @@ export default function DashboardPage() {
                 <div className="summary-card-icon" style={{ background: statusColor === 'success' ? '#dcfce7' : statusColor === 'warning' ? '#fef9c3' : '#fee2e2' }}>
                   {statusColor === 'success' ? '💚' : statusColor === 'warning' ? '⚠️' : '🔴'}
                 </div>
-                <div className="summary-card-label">Sisa Kas</div>
+                <div className="summary-card-label">{t('balance')}</div>
                 <div className={`summary-card-value ${statusColor}`}>
                   {formatRupiah(data?.summary.remaining || 0)}
                 </div>
                 <div className="summary-card-sub">
                   {data?.summary.totalBudget > 0
-                    ? `Tersisa ${100 - Math.min(100, pct)}%`
-                    : 'Kas belum diatur'}
+                    ? `${t('success')}: ${100 - Math.min(100, pct)}%`
+                    : t('set_budget_first')}
                 </div>
               </div>
 
               <div className="summary-card yellow">
                 <div className="summary-card-icon" style={{ background: '#fef9c3' }}>📈</div>
-                <div className="summary-card-label">Rata-rata Per Hari</div>
+                <div className="summary-card-label">{t('daily_avg')}</div>
                 <div className="summary-card-value">{formatRupiah(data?.summary.avgPerDay || 0)}</div>
-                <div className="summary-card-sub">Berdasarkan hari yang berlalu</div>
+                <div className="summary-card-sub">{t('digital_cashbook')}</div>
               </div>
             </div>
 
@@ -193,7 +197,7 @@ export default function DashboardPage() {
               {/* Bar chart harian */}
               <div className="card chart-full">
                 <div className="card-header">
-                  <h3 className="card-title">Pengeluaran Harian — {formatMonthYear(month, year)}</h3>
+                  <h3 className="card-title">{t('total_expense')} — {formatMonthYear(month, year, language)}</h3>
                 </div>
                 <div className="card-body">
                   {data?.dailyExpenses?.some(d => d.amount > 0) ? (
@@ -209,7 +213,7 @@ export default function DashboardPage() {
                   ) : (
                     <div className="empty-state">
                       <div className="empty-state-icon">📊</div>
-                      <p>Belum ada transaksi bulan ini</p>
+                      <p>{t('no_transactions')}</p>
                     </div>
                   )}
                 </div>
@@ -218,7 +222,7 @@ export default function DashboardPage() {
               {/* Donut chart kategori */}
               <div className="card">
                 <div className="card-header">
-                  <h3 className="card-title">Kategori Pengeluaran</h3>
+                  <h3 className="card-title">{t('category')}</h3>
                 </div>
                 <div className="card-body">
                   {data?.expenseByCategory?.length > 0 ? (
@@ -248,7 +252,8 @@ export default function DashboardPage() {
                         <Legend
                           formatter={(value) => {
                             const info = getCategoryInfo(value)
-                            return `${info.emoji} ${value.length > 18 ? value.slice(0, 18) + '…' : value}`
+                            const label = t(info.labelKey)
+                            return `${info.emoji} ${label.length > 18 ? label.slice(0, 18) + '…' : label}`
                           }}
                           wrapperStyle={{ fontSize: 11 }}
                         />
@@ -257,7 +262,7 @@ export default function DashboardPage() {
                   ) : (
                     <div className="empty-state">
                       <div className="empty-state-icon">🥧</div>
-                      <p>Belum ada data kategori</p>
+                      <p>{t('no_transactions')}</p>
                     </div>
                   )}
                 </div>
@@ -266,7 +271,7 @@ export default function DashboardPage() {
               {/* Line chart tren bulanan */}
               <div className="card">
                 <div className="card-header">
-                  <h3 className="card-title">Tren Pengeluaran 6 Bulan</h3>
+                  <h3 className="card-title">{t('statistics')}</h3>
                   <TrendingUp size={18} color="var(--color-primary-600)" />
                 </div>
                 <div className="card-body">
@@ -276,15 +281,15 @@ export default function DashboardPage() {
                       <XAxis
                         dataKey="month"
                         tick={{ fontSize: 11 }}
-                        tickFormatter={m => getMonthName(m)?.slice(0, 3)}
+                        tickFormatter={m => getMonthName(m, language)?.slice(0, 3)}
                       />
                       <YAxis
                         tick={{ fontSize: 11 }}
                         tickFormatter={v => `${(v / 1000000).toFixed(1)}jt`}
                       />
                       <Tooltip content={<CustomTooltipLine />} />
-                      <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} name="Pengeluaran" />
-                      <Line type="monotone" dataKey="budget" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} strokeDasharray="5 5" name="Kas" />
+                      <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} name={t('expense')} />
+                      <Line type="monotone" dataKey="budget" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} strokeDasharray="5 5" name={t('total_budget').split(' ')[1]} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -294,9 +299,9 @@ export default function DashboardPage() {
             {/* Transaksi Terbaru */}
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">Transaksi Terbaru</h3>
+                <h3 className="card-title">{t('recent_transactions')}</h3>
                 <Link href="/transaksi" className="btn btn-ghost btn-sm">
-                  Lihat Semua <ArrowRight size={14} />
+                  {t('view_all')} <ArrowRight size={14} />
                 </Link>
               </div>
               {data?.recentTransactions?.length > 0 ? (
@@ -304,11 +309,11 @@ export default function DashboardPage() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Item / Keperluan</th>
-                        <th className="hide-on-mobile">Kategori</th>
-                        <th>Nominal</th>
-                        <th className="hide-on-mobile">Tanggal</th>
-                        <th className="hide-on-mobile">Dicatat Oleh</th>
+                        <th>{t('item_name')}</th>
+                        <th className="hide-on-mobile">{t('category')}</th>
+                        <th>{t('amount')}</th>
+                        <th className="hide-on-mobile">{t('date')}</th>
+                        <th className="hide-on-mobile">{t('member_name')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -317,12 +322,12 @@ export default function DashboardPage() {
                           <td style={{ fontWeight: 500 }}>
                             {t.itemName}
                             <div className="show-on-mobile" style={{ fontSize: '0.75rem', marginTop: 2, color: 'var(--text-secondary)' }}>
-                              {formatDate(t.transactionDate)}
+                              {formatDate(t.transactionDate, language)}
                             </div>
                           </td>
                           <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
                           <td style={{ fontWeight: 600, color: '#ef4444' }}>{formatRupiah(t.amount)}</td>
-                          <td className="hide-on-mobile" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{formatDate(t.transactionDate)}</td>
+                          <td className="hide-on-mobile" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{formatDate(t.transactionDate, language)}</td>
                           <td className="hide-on-mobile">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <div
@@ -347,10 +352,10 @@ export default function DashboardPage() {
               ) : (
                 <div className="empty-state">
                   <div className="empty-state-icon">📝</div>
-                  <h3>Belum ada transaksi</h3>
-                  <p>Mulai catat pengeluaran pertama Anda</p>
+                  <h3>{t('no_transactions')}</h3>
+                  <p>{t(' 디지털_cashbook ')}</p>
                   <Link href="/transaksi/baru" className="btn btn-primary" style={{ marginTop: 16 }}>
-                    + Catat Pengeluaran
+                    + {t('add_expense')}
                   </Link>
                 </div>
               )}
