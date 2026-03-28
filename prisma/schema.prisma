@@ -1,0 +1,67 @@
+// Prisma Schema untuk Cash Book - Manajemen Keuangan Keluarga
+// Provider: MySQL (kompatibel dengan TiDB Cloud)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Member {
+  id          String   @id @default(uuid()) @db.Char(36)
+  name        String   @db.VarChar(100)
+  role        String   @default("member") @db.VarChar(10) // 'admin' atau 'member'
+  avatarColor String?  @map("avatar_color") @db.VarChar(20)
+  pin         String   @db.VarChar(255) // hashed PIN
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relasi
+  transactions   Transaction[]   @relation("MemberTransactions")
+  budgets        MonthlyBudget[] @relation("MemberBudgets")
+
+  @@map("members")
+}
+
+model MonthlyBudget {
+  id        String   @id @default(uuid()) @db.Char(36)
+  month     Int      // 1-12
+  year      Int
+  amount    BigInt   // dalam Rupiah
+  createdBy String?  @map("created_by") @db.Char(36)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relasi
+  creator Member? @relation("MemberBudgets", fields: [createdBy], references: [id])
+
+  @@unique([month, year], name: "uq_month_year")
+  @@map("monthly_budgets")
+}
+
+model Transaction {
+  id              String   @id @default(uuid()) @db.Char(36)
+  itemName        String   @map("item_name") @db.VarChar(255)
+  amount          BigInt   // dalam Rupiah
+  category        String   @db.VarChar(100)
+  transactionDate DateTime @map("transaction_date") @db.Date
+  notes           String?  @db.Text
+  memberId        String?  @map("member_id") @db.Char(36)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relasi
+  member Member? @relation("MemberTransactions", fields: [memberId], references: [id])
+
+  @@map("transactions")
+}
+
+model AppSettings {
+  id          String   @id @default("1") @db.Char(36)
+  familyName  String   @default("Cash Book") @map("family_name") @db.VarChar(100)
+  theme       String   @default("light") @db.VarChar(10)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
