@@ -293,11 +293,11 @@ export default function TransaksiPage() {
                       Tanggal {sortBy === 'transactionDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                     <th>Item / Keperluan</th>
-                    <th>Kategori</th>
+                    <th className="hide-on-mobile">Kategori</th>
                     <th className="sortable" onClick={() => handleSort('amount')}>
                       Nominal {sortBy === 'amount' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
-                    <th>Dicatat Oleh</th>
+                    <th className="hide-on-mobile">Dicatat Oleh</th>
                     <th>Aksi</th>
                   </tr>
                 </thead>
@@ -316,17 +316,20 @@ export default function TransaksiPage() {
                         </td>
                         <td>
                           <div style={{ fontWeight: 500 }}>{t.itemName}</div>
+                          <div className="show-on-mobile" style={{ fontSize: '0.75rem', marginTop: 2 }}>
+                            <CategoryBadge category={t.category} size="xs" />
+                          </div>
                           {t.notes && (
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
                               📝 {t.notes}
                             </div>
                           )}
                         </td>
-                        <td><CategoryBadge category={t.category} size="sm" /></td>
+                        <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
                         <td style={{ fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap' }}>
                           {formatRupiah(t.amount)}
                         </td>
-                        <td>
+                        <td className="hide-on-mobile">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{
                               width: 28, height: 28, borderRadius: '50%',

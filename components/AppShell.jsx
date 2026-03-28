@@ -154,6 +154,25 @@ export default function AppShell({ children }) {
 
         {/* Main Content */}
         <main className="main-content">
+          {/* Mobile Header */}
+          <header className="mobile-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ 
+                width: 32, height: 32, background: 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700))',
+                borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 16
+              }}>💰</div>
+              <span style={{ fontWeight: 700, fontSize: '1rem' }}>{familyName}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 5 }}>
+              <button onClick={toggleTheme} className="btn-icon">
+                {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+              </button>
+              <button onClick={handleLogout} className="btn-icon">
+                <LogOut size={18} />
+              </button>
+            </div>
+          </header>
+
           {children}
         </main>
 

@@ -301,8 +301,8 @@ function PengaturanContent() {
                     <thead>
                       <tr>
                         <th>Nama</th>
-                        <th>Role</th>
-                        <th>Status</th>
+                        <th className="hide-on-mobile">Role</th>
+                        <th className="hide-on-mobile">Status</th>
                         <th>Aksi</th>
                       </tr>
                     </thead>
@@ -318,13 +318,13 @@ function PengaturanContent() {
                               {m.id === user.id && <span className="badge badge-gray mx-2" style={{marginLeft: 8}}>Anda</span>}
                             </div>
                           </td>
-                          <td>
+                          <td className="hide-on-mobile">
                              {m.role === 'admin' ? 
                               <span className="badge badge-purple"><Shield size={12}/> Admin</span> : 
                               <span className="badge badge-blue">Member</span>
                              }
                           </td>
-                          <td>
+                          <td className="hide-on-mobile">
                             {m.isActive ? <span className="text-success text-sm font-medium">Aktif</span> : <span className="text-danger text-sm font-medium">Nonaktif</span>}
                           </td>
                           <td>

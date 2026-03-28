@@ -121,46 +121,42 @@ export default function LaporanPage() {
             <h3 className="card-title"><Filter size={16} /> Filter Rentang Tanggal</h3>
           </div>
           <div className="card-body">
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <div className="form-group" style={{ margin: 0 }}>
+            <div className="filter-bar" style={{ border: 'none', background: 'transparent', padding: 0 }}>
+              <div className="form-group" style={{ margin: 0, flex: 1 }}>
                 <label className="form-label" style={{ fontSize: '0.8rem' }}>Dari Tanggal</label>
                 <input
                   type="date"
                   className="form-input"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
-                  style={{ width: 160 }}
                 />
               </div>
-              <div className="form-group" style={{ margin: 0 }}>
+              <div className="form-group" style={{ margin: 0, flex: 1 }}>
                 <label className="form-label" style={{ fontSize: '0.8rem' }}>Sampai Tanggal</label>
                 <input
                   type="date"
                   className="form-input"
                   value={endDate}
                   onChange={e => setEndDate(e.target.value)}
-                  style={{ width: 160 }}
                 />
               </div>
-              <div className="form-group" style={{ margin: 0 }}>
+              <div className="form-group" style={{ margin: 0, flex: 1 }}>
                 <label className="form-label" style={{ fontSize: '0.8rem' }}>Anggota</label>
                 <select
                   className="form-select"
                   value={memberId}
                   onChange={e => setMemberId(e.target.value)}
-                  style={{ width: 150 }}
                 >
                   <option value="">Semua Anggota</option>
                   {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               </div>
-              <div className="form-group" style={{ margin: 0 }}>
+              <div className="form-group" style={{ margin: 0, flex: 1 }}>
                 <label className="form-label" style={{ fontSize: '0.8rem' }}>Kategori</label>
                 <select
                   className="form-select"
                   value={category}
                   onChange={e => setCategory(e.target.value)}
-                  style={{ width: 200 }}
                 >
                   <option value="">Semua Kategori</option>
                   {CATEGORIES.map(c => <option key={c.id} value={c.label}>{c.emoji} {c.label}</option>)}
@@ -324,29 +320,35 @@ export default function LaporanPage() {
                       <tr>
                         <th>Tanggal</th>
                         <th>Item</th>
-                        <th>Kategori</th>
+                        <th className="hide-on-mobile">Kategori</th>
                         <th>Nominal</th>
-                        <th>Dicatat Oleh</th>
-                        <th>Catatan</th>
+                        <th className="hide-on-mobile">Dicatat Oleh</th>
+                        <th className="hide-on-mobile">Catatan</th>
                       </tr>
                     </thead>
                     <tbody>
                       {transactions.map(t => (
                         <tr key={t.id}>
                           <td style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{formatDate(t.transactionDate)}</td>
-                          <td style={{ fontWeight: 500 }}>{t.itemName}</td>
-                          <td><CategoryBadge category={t.category} size="sm" /></td>
+                          <td style={{ fontWeight: 500 }}>
+                            {t.itemName}
+                            <div className="show-on-mobile" style={{ fontSize: '0.75rem', marginTop: 2 }}>
+                              <CategoryBadge category={t.category} size="xs" />
+                            </div>
+                          </td>
+                          <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
                           <td style={{ fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap' }}>{formatRupiah(t.amount)}</td>
-                          <td style={{ fontSize: '0.85rem' }}>{t.member?.name || '-'}</td>
-                          <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.notes || '-'}</td>
+                          <td className="hide-on-mobile" style={{ fontSize: '0.85rem' }}>{t.member?.name || '-'}</td>
+                          <td className="hide-on-mobile" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.notes || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan={3} style={{ fontWeight: 700, padding: '12px 16px' }}>TOTAL</td>
+                        <td className="hide-on-mobile" />
+                        <td colSpan={2} style={{ fontWeight: 700, padding: '12px 16px' }}>TOTAL</td>
                         <td style={{ fontWeight: 800, color: '#ef4444', fontSize: '1rem', padding: '12px 16px' }}>{formatRupiah(totalExpense)}</td>
-                        <td colSpan={2} />
+                        <td className="hide-on-mobile" colSpan={2} />
                       </tr>
                     </tfoot>
                   </table>

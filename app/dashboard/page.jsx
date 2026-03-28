@@ -305,20 +305,25 @@ export default function DashboardPage() {
                     <thead>
                       <tr>
                         <th>Item / Keperluan</th>
-                        <th>Kategori</th>
+                        <th className="hide-on-mobile">Kategori</th>
                         <th>Nominal</th>
-                        <th>Tanggal</th>
-                        <th>Dicatat Oleh</th>
+                        <th className="hide-on-mobile">Tanggal</th>
+                        <th className="hide-on-mobile">Dicatat Oleh</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.recentTransactions.map(t => (
                         <tr key={t.id}>
-                          <td style={{ fontWeight: 500 }}>{t.itemName}</td>
-                          <td><CategoryBadge category={t.category} size="sm" /></td>
+                          <td style={{ fontWeight: 500 }}>
+                            {t.itemName}
+                            <div className="show-on-mobile" style={{ fontSize: '0.75rem', marginTop: 2, color: 'var(--text-secondary)' }}>
+                              {formatDate(t.transactionDate)}
+                            </div>
+                          </td>
+                          <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
                           <td style={{ fontWeight: 600, color: '#ef4444' }}>{formatRupiah(t.amount)}</td>
-                          <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{formatDate(t.transactionDate)}</td>
-                          <td>
+                          <td className="hide-on-mobile" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{formatDate(t.transactionDate)}</td>
+                          <td className="hide-on-mobile">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <div
                                 style={{
