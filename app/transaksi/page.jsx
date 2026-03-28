@@ -172,12 +172,12 @@ export default function TransaksiPage() {
   return (
     <AppShell>
       <div className="page-container">
-        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div className="page-header">
           <div>
             <h1>{t('history')} 📋</h1>
             <p>{t('digital_cashbook')}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="page-header-actions">
             <button className="btn btn-ghost btn-sm" onClick={handleExport}>
               <Download size={15} /> {t('actions')} CSV
             </button>
@@ -189,10 +189,10 @@ export default function TransaksiPage() {
 
         <div className="card">
           {/* Filter bar */}
-          <div className="filter-bar" style={{ flexDirection: 'column', gap: 12 }}>
+          <div className="filter-bar">
             {/* Baris 1: search + kategori + anggota */}
-            <div style={{ display: 'flex', gap: 10, width: '100%', flexWrap: 'wrap' }}>
-              <div className="search-input-wrapper" style={{ flex: 2, minWidth: 180 }}>
+            <div className="filter-row" style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              <div className="search-input-wrapper" style={{ flex: '2 1 180px' }}>
                 <Search size={16} />
                 <input
                   type="text"
@@ -206,7 +206,7 @@ export default function TransaksiPage() {
                 className="form-select"
                 value={category}
                 onChange={e => { setCategory(e.target.value); setPage(1) }}
-                style={{ flex: 1, minWidth: 160 }}
+                style={{ flex: '1 1 160px' }}
               >
                 <option value="">{t('all_categories')}</option>
                 {CATEGORIES.map(c => (
@@ -217,7 +217,7 @@ export default function TransaksiPage() {
                 className="form-select"
                 value={memberId}
                 onChange={e => { setMemberId(e.target.value); setPage(1) }}
-                style={{ flex: 1, minWidth: 140 }}
+                style={{ flex: '1 1 140px' }}
               >
                 <option value="">{t('all_members')}</option>
                 {members.map(m => (
@@ -227,23 +227,25 @@ export default function TransaksiPage() {
             </div>
 
             {/* Baris 2: date range + presets */}
-            <div style={{ display: 'flex', gap: 10, width: '100%', flexWrap: 'wrap', alignItems: 'center' }}>
-              <input
-                type="date"
-                className="form-input"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                style={{ width: 150 }}
-              />
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>s/d</span>
-              <input
-                type="date"
-                className="form-input"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                style={{ width: 150 }}
-              />
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div className="filter-row" style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '1 1 300px' }}>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>s/d</span>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: '1 1 auto' }}>
                 {[
                   { id: '7days', label: t('d_7days') },
                   { id: '30days', label: t('d_30days') },
@@ -315,8 +317,9 @@ export default function TransaksiPage() {
 
                     return (
                       <tr key={t.id}>
-                        <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                          {formatDate(t.transactionDate, language)}
+                        <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', verticalAlign: 'top', paddingTop: 16 }}>
+                          {formatDate(t.transactionDate, language).split(' ').slice(0, 2).join(' ')}
+                          <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>{formatDate(t.transactionDate, language).split(' ')[2]}</div>
                         </td>
                         <td>
                           <div style={{ fontWeight: 500 }}>{t.itemName}</div>
@@ -330,7 +333,7 @@ export default function TransaksiPage() {
                           )}
                         </td>
                         <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
-                        <td style={{ fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap' }}>
+                        <td style={{ fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap', textAlign: 'right' }}>
                           {formatRupiah(t.amount)}
                         </td>
                         <td className="hide-on-mobile">
