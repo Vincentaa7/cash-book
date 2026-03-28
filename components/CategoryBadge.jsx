@@ -9,8 +9,8 @@ export default function CategoryBadge({ category, size = 'normal' }) {
   const style = {
     backgroundColor: info.color + '20',
     color: info.color,
-    fontSize: size === 'sm' ? '0.7rem' : '0.75rem',
-    padding: size === 'sm' ? '2px 8px' : '4px 10px',
+    fontSize: size === 'xs' ? '0.6rem' : (size === 'sm' ? '0.7rem' : '0.75rem'),
+    padding: size === 'xs' ? '1px 6px' : (size === 'sm' ? '2px 8px' : '4px 10px'),
   }
 
   return (

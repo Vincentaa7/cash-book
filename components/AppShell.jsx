@@ -187,9 +187,11 @@ export default function AppShell({ children }) {
               <List size={20} />
               <span>Riwayat</span>
             </Link>
-            <Link href="/transaksi/baru" className="bottom-nav-item add-btn">
-              <PlusCircle size={24} />
-            </Link>
+            <div className="bottom-nav-item-wrapper">
+              <Link href="/transaksi/baru" className="bottom-nav-item add-btn">
+                <PlusCircle size={24} />
+              </Link>
+            </div>
             <Link href="/laporan" className={`bottom-nav-item ${pathname === '/laporan' ? 'active' : ''}`}>
               <BarChart2 size={20} />
               <span>Laporan</span>
