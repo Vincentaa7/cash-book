@@ -295,16 +295,16 @@ export default function TransaksiPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th className="sortable" onClick={() => handleSort('transactionDate')}>
+                    <th className="sortable" onClick={() => handleSort('transactionDate')} style={{ width: '22%' }}>
                       {t('date')} {sortBy === 'transactionDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
-                    <th>{t('item_name')}</th>
-                    <th className="hide-on-mobile">{t('category')}</th>
-                    <th className="sortable" onClick={() => handleSort('amount')}>
+                    <th style={{ width: '35%' }}>{t('item_name')}</th>
+                    <th className="hide-on-mobile" style={{ width: '15%' }}>{t('category')}</th>
+                    <th className="sortable" onClick={() => handleSort('amount')} style={{ width: '28%', textAlign: 'right' }}>
                       {t('amount')} {sortBy === 'amount' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
-                    <th className="hide-on-mobile">{t('member_name')}</th>
-                    <th>{t('actions')}</th>
+                    <th className="hide-on-mobile" style={{ width: '15%' }}>{t('member_name')}</th>
+                    <th style={{ width: '15%', textAlign: 'center' }}>{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -317,9 +317,8 @@ export default function TransaksiPage() {
 
                     return (
                       <tr key={t.id}>
-                        <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', verticalAlign: 'top', paddingTop: 16 }}>
-                          {formatDate(t.transactionDate, language).split(' ').slice(0, 2).join(' ')}
-                          <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>{formatDate(t.transactionDate, language).split(' ')[2]}</div>
+                        <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>
+                          {formatDate(t.transactionDate, language)}
                         </td>
                         <td>
                           <div style={{ fontWeight: 500 }}>{t.itemName}</div>
@@ -333,7 +332,7 @@ export default function TransaksiPage() {
                           )}
                         </td>
                         <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
-                        <td style={{ fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                        <td style={{ fontWeight: 700, color: '#ef4444', textAlign: 'right', fontSize: '0.85rem' }}>
                           {formatRupiah(t.amount)}
                         </td>
                         <td className="hide-on-mobile">
@@ -349,8 +348,8 @@ export default function TransaksiPage() {
                             <span style={{ fontSize: '0.85rem' }}>{t.member?.name || '-'}</span>
                           </div>
                         </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 4 }}>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                             {canEdit && (
                               <button className="btn-icon" onClick={() => openEdit(t)} title="Edit">
                                 <Edit2 size={14} />
