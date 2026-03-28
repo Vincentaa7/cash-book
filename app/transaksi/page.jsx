@@ -6,7 +6,7 @@ import AppShell from '@/components/AppShell'
 import CategoryBadge from '@/components/CategoryBadge'
 import { formatRupiah, formatDate, formatDateInput } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo, getInitials } from '@/lib/constants'
-import { Search, Download, Edit2, Trash2, X, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Download, Edit2, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 
 export default function TransaksiPage() {

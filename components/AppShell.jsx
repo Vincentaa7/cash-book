@@ -3,11 +3,11 @@
 // Semua halaman autentikasi dibungkus komponen ini
 
 import { useState, useEffect, createContext, useContext } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
   LayoutDashboard, PlusCircle, List, BarChart2,
-  Settings, LogOut, BookOpen, Sun, Moon, Menu, X
+  Settings, LogOut, Sun, Moon
 } from 'lucide-react'
 import { getInitials } from '@/lib/constants'
 
@@ -24,11 +24,9 @@ const NAV_ITEMS = [
 ]
 
 export default function AppShell({ children }) {
-  const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState(null)
   const [theme, setTheme] = useState('light')
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [familyName, setFamilyName] = useState('Cash Book')
 
   // Ambil data user saat mount

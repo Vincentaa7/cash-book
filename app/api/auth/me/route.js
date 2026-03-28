@@ -1,7 +1,7 @@
 // app/api/auth/me/route.js - Get current user info
 
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { getSession, clearSessionCookie } from '@/lib/auth'
 import prisma from '@/lib/db'
 
 export async function GET() {
@@ -17,7 +17,6 @@ export async function GET() {
     })
 
     if (!member || !member.isActive) {
-      const { clearSessionCookie } = require('@/lib/auth')
       const cookieOptions = clearSessionCookie()
       const response = NextResponse.json({ error: 'Sesi tidak valid' }, { status: 401 })
       response.cookies.set(cookieOptions)

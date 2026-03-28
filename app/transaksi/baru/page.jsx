@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import AppShell from '@/components/AppShell'
 import { CATEGORIES } from '@/lib/constants'
 import { formatRupiah, formatNumber, formatDateInput, getBudgetStatusColor } from '@/lib/format'
-import { CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react'
+import { AlertCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 export default function NewTransactionPage() {

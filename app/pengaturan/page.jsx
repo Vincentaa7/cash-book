@@ -10,7 +10,7 @@ import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle,
 
 function PengaturanContent() {
   const router = useRouter()
-  const { user, familyName, setFamilyName } = useUser()
+  const { user, setFamilyName } = useUser()
   const [activeTab, setActiveTab] = useState('budget')
   const [loading, setLoading] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')

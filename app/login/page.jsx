@@ -2,10 +2,7 @@
 // app/login/page.jsx - Halaman Login
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-
 export default function LoginPage() {
-  const router = useRouter()
   const [name, setName] = useState('')
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
