@@ -9,6 +9,10 @@ export const metadata = {
   title: 'Cash Book - Buku Keuangan Keluarga',
   description: 'Aplikasi manajemen keuangan keluarga digital. Catat pengeluaran, pantau kas bulanan, dan buat laporan keuangan dengan mudah.',
   keywords: 'buku kas, keuangan keluarga, pengeluaran, anggaran, manajemen keuangan',
+  robots: {
+    index: false,
+    follow: false,
+  },
 }
 
 export const viewport = {
