@@ -363,9 +363,14 @@ img { max-width: 100%; display: block; }
   color: var(--color-primary-600);
 }
 
+@keyframes spin-gradient {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .bottom-nav-item.add-btn {
-  color: white;
-  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700));
+  color: var(--color-primary-600); /* Ikon diubah jadi warna hijau utama */
+  background: white; /* Background d ubah menjadi putih */
   border-radius: 50%;
   width: 52px;
   height: 52px;
@@ -373,6 +378,23 @@ img { max-width: 100%; display: block; }
   box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
   margin-top: -16px;
   padding: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.bottom-nav-item.add-btn::before {
+  content: "";
+  position: absolute;
+  inset: -2px; /* Dibuat lebih tipis */
+  border-radius: 50%;
+  padding: 2px; /* Dibuat lebih tipis mengikuti ketebalan border */
+  background: conic-gradient(from 0deg, #ff4545, #00ff99, #006aff, #ff0095, #ff4545);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: spin-gradient 3s linear infinite;
+  pointer-events: none;
 }
 
 /* ============================================================

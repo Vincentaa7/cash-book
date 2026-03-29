@@ -313,7 +313,7 @@ function PengaturanContent() {
                         <tr key={m.id} style={{ opacity: m.isActive ? 1 : 0.6 }}>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: m.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '0.8rem' }}>
+                              <div style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', background: m.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '0.8rem' }}>
                                 {m.name.substring(0,2).toUpperCase()}
                               </div>
                               <span style={{ fontWeight: 500 }}>{m.name}</span>
@@ -425,19 +425,19 @@ function PengaturanContent() {
                     className="form-input"
                     value={memberForm.name}
                     onChange={e => setMemberForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder={t('search_placeholder')}
+                    placeholder="Masukkan nama anggota"
                     required
                   />
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">PIN Login (4-6 digit angka)</label>
+                  <label className="form-label">Password Login (4-6 digit angka)</label>
                   <input
                     type="password"
                     inputMode="numeric"
                     className="form-input"
                     value={memberForm.pin}
                     onChange={e => setMemberForm(f => ({ ...f, pin: e.target.value }))}
-                    placeholder={editMember ? `(${t('cancel').toLowerCase()})` : t('search_placeholder')}
+                    placeholder={editMember ? 'Kosongkan jika tidak diubah' : 'Masukkan password'}
                     required={!editMember}
                   />
                 </div>

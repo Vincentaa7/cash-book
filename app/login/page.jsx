@@ -85,7 +85,7 @@ export default function LoginPage() {
               id="login-name"
               type="text"
               className="form-input"
-              placeholder={t('search_placeholder')}
+              placeholder="Masukkan nama anggota"
               value={name}
               onChange={e => setName(e.target.value)}
               autoFocus
@@ -95,14 +95,14 @@ export default function LoginPage() {
 
           <div className="form-group">
             <label className="form-label" htmlFor="login-pin">
-              PIN {t('settings')}
+              Password Login
             </label>
             <div style={{ position: 'relative' }}>
               <input
                 id="login-pin"
                 type={showPin ? 'text' : 'password'}
                 className="form-input"
-                placeholder={t('search_placeholder')}
+                placeholder="Masukkan password"
                 value={pin}
                 onChange={e => setPin(e.target.value)}
                 autoComplete="current-password"
@@ -147,7 +147,7 @@ export default function LoginPage() {
                 {t('loading')}
               </>
             ) : (
-              <> {t('login_button')}</>
+              <> Masuk</>
             )}
           </button>
         </form>
