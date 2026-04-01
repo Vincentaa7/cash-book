@@ -323,7 +323,8 @@ function PengaturanContent() {
                           className="form-input"
                           style={{ 
                             paddingLeft: 40, 
-                            backgroundColor: initialBudget > 0 ? '#f1f5f9' : 'white',
+                            backgroundColor: initialBudget > 0 ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                            color: 'var(--text-primary)',
                             cursor: initialBudget > 0 ? 'not-allowed' : 'text'
                           }}
                           placeholder="0"
