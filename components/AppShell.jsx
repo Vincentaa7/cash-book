@@ -12,6 +12,7 @@ import {
 import { getInitials } from '@/lib/constants'
 import { useLanguage } from '@/components/LanguageContext'
 import { useUser } from '@/components/UserContext'
+import CarryOverModal from '@/components/CarryOverModal'
 
 const NAV_ITEMS = [
   { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
@@ -26,6 +27,25 @@ export default function AppShell({ children }) {
   const { t, language } = useLanguage()
   const { user, loading, familyName } = useUser()
   const [theme, setTheme] = useState('light')
+  const [carryOverData, setCarryOverData] = useState(null)
+  const [isSnoozed, setIsSnoozed] = useState(false)
+
+  // Cek Pindahan Saldo (Hanya jika admin & login)
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      checkCarryOver()
+    }
+  }, [user])
+
+  async function checkCarryOver() {
+    try {
+      const res = await fetch('/api/budget/check-carryover')
+      const data = await res.json()
+      if (data.hasCarryover) {
+        setCarryOverData(data)
+      }
+    } catch {}
+  }
 
   // Ambil tema dari localStorage
   useEffect(() => {
@@ -146,6 +166,26 @@ export default function AppShell({ children }) {
           </div>
         </header>
 
+        {/* Global Reminder Banner (Dashboard Only) */}
+        {pathname === '/dashboard' && isSnoozed && carryOverData && (
+          <div className="page-container" style={{ paddingBottom: 0 }}>
+            <div className="reminder-banner" onClick={() => setIsSnoozed(false)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ padding: 8, background: '#ecfdf5', borderRadius: 10, color: '#10b981' }}>
+                  <PlusCircle size={20} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, color: '#064e3b', fontSize: '0.9rem' }}>{t('carryover_reminder')}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#059669' }}>{t('click_to_process')}</div>
+                </div>
+              </div>
+              <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.85rem', borderRadius: 8, background: '#10b981', border: 'none' }}>
+                {t('process_now')}
+              </button>
+            </div>
+          </div>
+        )}
+
         {children}
       </main>
 
@@ -175,6 +215,23 @@ export default function AppShell({ children }) {
           </Link>
         </div>
       </nav>
+
+      {/* Modal Pindahan Saldo */}
+      {carryOverData && !isSnoozed && (
+        <CarryOverModal 
+          amount={carryOverData.amount}
+          prevMonth={carryOverData.prevMonth}
+          prevYear={carryOverData.prevYear}
+          onSnooze={() => setIsSnoozed(true)}
+          onComplete={(success) => {
+            setCarryOverData(null)
+            setIsSnoozed(false)
+            if (success) {
+              window.location.reload()
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

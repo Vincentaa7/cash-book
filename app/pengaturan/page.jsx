@@ -24,6 +24,8 @@ function PengaturanContent() {
   const [currentMonth] = useState(now.getMonth() + 1)
   const [currentYear] = useState(now.getFullYear())
   const [budgetAmount, setBudgetAmount] = useState('')
+  const [initialBudget, setInitialBudget] = useState(0) // Untuk cek apakah sudah ada budget
+  const [addAmount, setAddAmount] = useState('')
 
   // Members state
   const [members, setMembers] = useState([])
@@ -55,7 +57,10 @@ function PengaturanContent() {
         fetch('/api/settings').then(r => r.json())
       ])
       
-      if (b.budget) setBudgetAmount(String(b.budget.amount))
+      if (b.budget) {
+        setBudgetAmount(String(b.budget.amount))
+        setInitialBudget(Number(b.budget.amount))
+      }
       if (M.members) setMembers(M.members)
       if (s.settings?.familyName) setFormFamilyName(s.settings.familyName)
     } catch {}
@@ -84,6 +89,9 @@ function PengaturanContent() {
       return
     }
 
+    // Alert Konfirmasi untuk set pertama kali
+    if (!confirm(t('confirm_budget_msg'))) return
+
     setLoading(true)
     try {
       const res = await fetch('/api/budget', {
@@ -92,13 +100,48 @@ function PengaturanContent() {
         body: JSON.stringify({
           month: currentMonth,
           year: currentYear,
-          amount: parseInt(budgetAmount)
+          amount: parseInt(budgetAmount),
+          action: 'set'
         })
       })
       if (res.ok) {
+        fetchData()
         showMessage('success', t('save') + ' ' + t('budget_settings'))
       } else {
         showMessage('error', t('connection_error'))
+      }
+    } catch {
+      showMessage('error', t('connection_error'))
+    }
+    setLoading(false)
+  }
+
+  async function handleAddBudget(e) {
+    e.preventDefault()
+    if (!addAmount || Number(addAmount) <= 0) {
+      showMessage('error', 'Jumlah tambahan harus lebih dari 0')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          month: currentMonth,
+          year: currentYear,
+          amount: parseInt(addAmount),
+          action: 'add'
+        })
+      })
+      if (res.ok) {
+        setAddAmount('')
+        fetchData()
+        showMessage('success', t('add_cash_success'))
+      } else {
+        const d = await res.json()
+        showMessage('error', d.error || t('connection_error'))
       }
     } catch {
       showMessage('error', t('connection_error'))
@@ -255,15 +298,21 @@ function PengaturanContent() {
           <div style={{ flex: '3', minWidth: 300 }}>
             {activeTab === 'budget' && (
               <div className="card fade-in-up">
-                <div className="card-header">
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 className="card-title">{t('budget_settings')}</h3>
+                  {initialBudget > 0 && (
+                    <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Shield size={12} /> {t('initial_budget_set')}
+                    </span>
+                  )}
                 </div>
                 <div className="card-body">
                   <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: '0.9rem' }}>
-                    {t('set_budget_first')}
+                    {initialBudget > 0 ? t('budget_locked_info') : t('set_budget_first')}
                   </p>
                   
-                  <form onSubmit={handleSaveBudget} style={{ maxWidth: 400 }}>
+                  {/* Set Initial Budget (Only visible/editable if not set) */}
+                  <form onSubmit={handleSaveBudget} style={{ maxWidth: 400, marginBottom: initialBudget > 0 ? 32 : 0 }}>
                     <div className="form-group">
                       <label className="form-label">{t('total_budget')} (Rp)</label>
                       <div style={{ position: 'relative' }}>
@@ -272,8 +321,13 @@ function PengaturanContent() {
                           type="text"
                           inputMode="numeric"
                           className="form-input"
-                          style={{ paddingLeft: 40 }}
+                          style={{ 
+                            paddingLeft: 40, 
+                            backgroundColor: initialBudget > 0 ? '#f1f5f9' : 'white',
+                            cursor: initialBudget > 0 ? 'not-allowed' : 'text'
+                          }}
                           placeholder="0"
+                          readOnly={initialBudget > 0}
                           value={budgetAmount ? formatNumber(parseInt(budgetAmount)) : ''}
                           onChange={e => {
                             const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -282,10 +336,43 @@ function PengaturanContent() {
                         />
                       </div>
                     </div>
-                    <button type="submit" className="btn btn-primary" disabled={loading}>
-                      {loading ? t('loading') : t('save')}
-                    </button>
+                    {initialBudget === 0 && (
+                      <button type="submit" className="btn btn-primary" disabled={loading}>
+                        {loading ? t('loading') : t('save')}
+                      </button>
+                    )}
                   </form>
+
+                  {/* Add Cash (Top-up) - Only visible if budget exists */}
+                  {initialBudget > 0 && (
+                    <div style={{ padding: 20, background: '#f8fafc', borderRadius: 16, border: '1px dashed #cbd5e1' }}>
+                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                         <PlusCircle size={18} color="#10b981" /> {t('add_cash')}
+                      </h4>
+                      <form onSubmit={handleAddBudget} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                        <div className="form-group" style={{ margin: 0, flex: 2, minWidth: 200 }}>
+                          <div style={{ position: 'relative' }}>
+                            <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 600 }}>Rp</div>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              className="form-input"
+                              style={{ paddingLeft: 40 }}
+                              placeholder="0"
+                              value={addAmount ? formatNumber(parseInt(addAmount)) : ''}
+                              onChange={e => {
+                                const raw = e.target.value.replace(/[^0-9]/g, '');
+                                setAddAmount(raw)
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={loading}>
+                          {loading ? t('loading') : `+ ${t('add_cash')}`}
+                        </button>
+                      </form>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

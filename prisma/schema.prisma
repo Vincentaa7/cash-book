@@ -58,10 +58,11 @@ model Transaction {
 }
 
 model AppSettings {
-  id          String   @id @default("1") @db.Char(36)
-  familyName  String   @default("Cash Book") @map("family_name") @db.VarChar(100)
-  theme       String   @default("light") @db.VarChar(10)
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default("1") @db.Char(36)
+  familyName          String   @default("Cash Book") @map("family_name") @db.VarChar(100)
+  theme               String   @default("light") @db.VarChar(10)
+  lastCarryOverMonth  String?  @map("last_carry_over_month") @db.VarChar(7)
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@map("app_settings")
 }

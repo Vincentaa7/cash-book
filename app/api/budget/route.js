@@ -50,26 +50,49 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Hanya admin yang bisa mengatur kas bulanan' }, { status: 403 })
     }
 
-    const { month, year, amount } = await request.json()
+    const { month, year, amount, action = 'set' } = await request.json()
+    const parsedMonth = parseInt(month)
+    const parsedYear = parseInt(year)
+    const parsedAmount = BigInt(amount)
 
     if (!month || !year || !amount || amount <= 0) {
       return NextResponse.json({ error: 'Data kas tidak valid' }, { status: 400 })
     }
 
-    // Upsert: update jika ada, create jika belum
-    const budget = await prisma.monthlyBudget.upsert({
-      where: { uq_month_year: { month: parseInt(month), year: parseInt(year) } },
-      update: {
-        amount: BigInt(amount),
-        createdBy: session.id,
-      },
-      create: {
-        month: parseInt(month),
-        year: parseInt(year),
-        amount: BigInt(amount),
-        createdBy: session.id,
-      },
-    })
+    let budget;
+    if (action === 'add') {
+      // Periksa apakah budget sudah ada sebelum increment
+      const existing = await prisma.monthlyBudget.findUnique({
+        where: { uq_month_year: { month: parsedMonth, year: parsedYear } }
+      })
+
+      if (!existing) {
+        return NextResponse.json({ error: 'Harus mengatur kas utama terlebih dahulu' }, { status: 400 })
+      }
+
+      budget = await prisma.monthlyBudget.update({
+        where: { uq_month_year: { month: parsedMonth, year: parsedYear } },
+        data: {
+          amount: { increment: parsedAmount },
+          createdBy: session.id,
+        },
+      })
+    } else {
+      // Upsert: update jika ada, create jika belum
+      budget = await prisma.monthlyBudget.upsert({
+        where: { uq_month_year: { month: parsedMonth, year: parsedYear } },
+        update: {
+          amount: parsedAmount,
+          createdBy: session.id,
+        },
+        create: {
+          month: parsedMonth,
+          year: parsedYear,
+          amount: parsedAmount,
+          createdBy: session.id,
+        },
+      })
+    }
 
     return NextResponse.json({
       budget: { ...budget, amount: Number(budget.amount) },
