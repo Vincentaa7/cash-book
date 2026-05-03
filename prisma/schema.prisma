@@ -66,3 +66,17 @@ model AppSettings {
 
   @@map("app_settings")
 }
+
+// Tabel untuk menyimpan rekap bulanan setelah transaksi satuan dihapus (> 90 hari)
+model MonthlySnapshot {
+  id          String   @id @default(uuid()) @db.Char(36)
+  month       Int      // 1-12
+  year        Int
+  category    String   @db.VarChar(100)
+  totalAmount BigInt   @map("total_amount")  // total Rupiah bulan itu untuk kategori ini
+  txCount     Int      @map("tx_count")       // jumlah transaksi yang diarsipkan
+  archivedAt  DateTime @default(now()) @map("archived_at")
+
+  @@unique([month, year, category], name: "uq_snapshot")
+  @@map("monthly_snapshots")
+}

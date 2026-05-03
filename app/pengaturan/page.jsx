@@ -8,7 +8,7 @@ import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import { formatRupiah, formatNumber } from '@/lib/format'
 import { AVATAR_COLORS } from '@/lib/constants'
-import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle, Shield } from 'lucide-react'
+import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle, Shield, Database, Trash } from 'lucide-react'
 
 function PengaturanContent() {
   const router = useRouter()
@@ -18,6 +18,11 @@ function PengaturanContent() {
   const [loading, setLoading] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+
+  // Database cleanup state
+  const [dbPreview, setDbPreview] = useState(null)
+  const [dbLoading, setDbLoading] = useState(false)
+  const [cleanupDone, setCleanupDone] = useState(null)
 
   // Budget state
   const now = new Date()
@@ -65,6 +70,40 @@ function PengaturanContent() {
       if (s.settings?.familyName) setFormFamilyName(s.settings.familyName)
     } catch {}
     setLoading(false)
+  }
+
+  // --- Database Cleanup Handlers ---
+  async function fetchDbPreview() {
+    setDbLoading(true)
+    setCleanupDone(null)
+    try {
+      const res = await fetch('/api/cleanup')
+      const d = await res.json()
+      setDbPreview(d)
+    } catch {
+      showMessage('error', t('db_error_load'))
+    }
+    setDbLoading(false)
+  }
+
+  async function handleCleanup() {
+    if (!dbPreview || dbPreview.eligible === 0) return
+    if (!confirm(t('db_confirm').replace('{count}', dbPreview.eligible))) return
+    setDbLoading(true)
+    try {
+      const res = await fetch('/api/cleanup', { method: 'POST' })
+      const d = await res.json()
+      if (res.ok) {
+        setCleanupDone(d)
+        setDbPreview(null)
+        showMessage('success', d.message)
+      } else {
+        showMessage('error', d.error || t('db_error_run'))
+      }
+    } catch {
+      showMessage('error', t('connection_error') || 'Connection error')
+    }
+    setDbLoading(false)
   }
 
   function showMessage(type, text) {
@@ -291,6 +330,13 @@ function PengaturanContent() {
               >
                 <Settings size={18} /> {t('app_preferences')}
               </div>
+              <div 
+                className={`nav-link ${activeTab === 'database' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('database'); fetchDbPreview() }}
+                style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'database' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
+              >
+                <Database size={18} /> Database
+              </div>
             </div>
           </div>
 
@@ -489,6 +535,134 @@ function PengaturanContent() {
                       {loading ? t('loading') : t('save')}
                     </button>
                   </form>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'database' && (
+              <div className="card fade-in-up">
+                <div className="card-header">
+                  <h3 className="card-title"><Database size={18} /> {t('db_management')}</h3>
+                </div>
+                <div className="card-body">
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: '0.9rem', lineHeight: 1.6 }}>
+                    {t('db_description')}
+                  </p>
+
+                  {/* Info box */}
+                  <div style={{ background: 'var(--bg-tertiary)', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontWeight: 600 }}>
+                      <span>✅</span> {t('db_kept_title')}
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.8 }}>
+                      <li>{t('db_kept_1')}</li>
+                      <li>{t('db_kept_2')}</li>
+                      <li>{t('db_kept_3')}</li>
+                      <li>{t('db_kept_4')}</li>
+                    </ul>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, marginTop: 16, fontWeight: 600 }}>
+                      <span>❌</span> {t('db_deleted_title')}
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.8 }}>
+                      <li>{t('db_deleted_1')}</li>
+                      <li>{t('db_deleted_2')}</li>
+                      <li>{t('db_deleted_3')}</li>
+                    </ul>
+                  </div>
+
+                  {/* Preview hasil */}
+                  {dbLoading && (
+                    <div className="loading-container" style={{ padding: 20 }}>
+                      <div className="spinner" />
+                      <p>{t('db_analyzing')}</p>
+                    </div>
+                  )}
+
+                  {!dbLoading && dbPreview && (
+                    <div style={{ marginBottom: 24 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
+                        <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '14px 18px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
+                          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-primary-600)' }}>{dbPreview.totalInDb ?? '-'}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>{t('db_total_in_db')}</div>
+                        </div>
+                        <div style={{ background: dbPreview.eligible > 0 ? '#fef2f2' : 'var(--bg-secondary)', borderRadius: 10, padding: '14px 18px', textAlign: 'center', border: `1px solid ${dbPreview.eligible > 0 ? '#fecaca' : 'var(--border-color)'}` }}>
+                          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: dbPreview.eligible > 0 ? '#ef4444' : 'var(--text-muted)' }}>{dbPreview.eligible}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>{t('db_eligible')}</div>
+                        </div>
+                        <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '14px 18px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
+                          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-secondary)' }}>{dbPreview.monthsAffected?.length ?? 0}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>{t('db_months_affected')}</div>
+                        </div>
+                      </div>
+
+                      {dbPreview.eligible === 0 ? (
+                        <div className="alert alert-success">
+                          <Check size={16} />
+                          <span>{t('db_clean')}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ marginBottom: 16 }}>
+                            <div style={{ fontWeight: 600, marginBottom: 8, fontSize: '0.875rem' }}>{t('db_months_to_archive')}</div>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {dbPreview.monthsAffected?.map(m => (
+                                <span key={`${m.year}-${m.month}`} className="badge badge-gray">
+                                  {String(m.month).padStart(2,'0')}/{m.year} — {m.count} {t('db_tx_count')}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="alert alert-warning">
+                            <AlertCircle size={16} />
+                            <span>{t('db_warning').replace('{count}', dbPreview.eligible)}</span>
+                          </div>
+
+                          <button
+                            className="btn btn-danger"
+                            onClick={handleCleanup}
+                            disabled={dbLoading}
+                            style={{ marginTop: 16 }}
+                          >
+                            <Trash size={16} /> {t('db_btn_archive').replace('{count}', dbPreview.eligible)}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Hasil setelah cleanup berhasil */}
+                  {!dbLoading && cleanupDone && (
+                    <div>
+                      <div className="alert alert-success" style={{ marginBottom: 16 }}>
+                        <Check size={16} />
+                        <span>{cleanupDone.message}</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+                        <div style={{ background: '#dcfce7', borderRadius: 10, padding: '14px 18px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#16a34a' }}>{cleanupDone.archived}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#166534', marginTop: 4 }}>{t('db_archived_count')}</div>
+                        </div>
+                        <div style={{ background: '#dcfce7', borderRadius: 10, padding: '14px 18px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#16a34a' }}>{cleanupDone.monthsAffected}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#166534', marginTop: 4 }}>{t('db_months_processed')}</div>
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={fetchDbPreview}
+                        style={{ marginTop: 16 }}
+                      >
+                        🔄 {t('db_btn_recheck')}
+                      </button>
+                    </div>
+                  )}
+
+                  {!dbLoading && !dbPreview && !cleanupDone && (
+                    <button className="btn btn-secondary" onClick={fetchDbPreview}>
+                      <Database size={16} /> {t('db_btn_analyze')}
+                    </button>
+                  )}
                 </div>
               </div>
             )}

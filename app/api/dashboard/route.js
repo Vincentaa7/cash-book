@@ -86,7 +86,11 @@ export async function GET(request) {
       .map(([category, amount]) => ({ category, amount }))
       .sort((a, b) => b.amount - a.amount)
 
-    // Tren 6 bulan terakhir
+    // Tren 6 bulan terakhir (fallback ke monthly_snapshots jika data sudah diarsip)
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - 90)
+    cutoffDate.setHours(0, 0, 0, 0)
+
     const monthlyTrends = []
     for (let i = 5; i >= 0; i--) {
       let m = month - i
@@ -95,10 +99,33 @@ export async function GET(request) {
       const mFirstDay = new Date(y, m - 1, 1)
       const mLastDay = new Date(y, m, 0)
 
-      const mExpense = await prisma.transaction.aggregate({
-        where: { transactionDate: { gte: mFirstDay, lte: mLastDay } },
-        _sum: { amount: true },
-      })
+      let expenseAmount = 0
+
+      // Cek apakah bulan ini sudah melewati cutoff (data mungkin sudah diarsip)
+      if (mLastDay < cutoffDate) {
+        // Ambil dari monthly_snapshots
+        const snapshotAgg = await prisma.monthlySnapshot.aggregate({
+          where: { month: m, year: y },
+          _sum: { totalAmount: true },
+        })
+        expenseAmount = Number(snapshotAgg._sum.totalAmount || 0)
+
+        // Jika snapshot kosong, coba fallback ke transactions (mungkin belum dicleanup)
+        if (expenseAmount === 0) {
+          const txAgg = await prisma.transaction.aggregate({
+            where: { transactionDate: { gte: mFirstDay, lte: mLastDay } },
+            _sum: { amount: true },
+          })
+          expenseAmount = Number(txAgg._sum.amount || 0)
+        }
+      } else {
+        // Bulan masih dalam range 90 hari, ambil dari transactions
+        const mExpense = await prisma.transaction.aggregate({
+          where: { transactionDate: { gte: mFirstDay, lte: mLastDay } },
+          _sum: { amount: true },
+        })
+        expenseAmount = Number(mExpense._sum.amount || 0)
+      }
 
       const mBudget = await prisma.monthlyBudget.findUnique({
         where: { uq_month_year: { month: m, year: y } },
@@ -107,7 +134,7 @@ export async function GET(request) {
       monthlyTrends.push({
         month: m,
         year: y,
-        expense: Number(mExpense._sum.amount || 0),
+        expense: expenseAmount,
         budget: mBudget ? Number(mBudget.amount) : 0,
       })
     }
