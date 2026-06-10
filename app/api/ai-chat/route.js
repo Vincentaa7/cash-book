@@ -85,10 +85,21 @@ export async function POST(request) {
       })
       .join('\n')
 
+    const todayStr = new Date().toLocaleDateString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
     // 6. Susun System Prompt AI
     const systemPrompt = `Anda adalah "Antigravity AI Keuangan", sebuah asisten keuangan pintar, ramah, dan jujur untuk keluarga "${familyName}".
 
 Tugas Anda adalah menganalisis data kas buku dan pengeluaran keluarga berdasarkan data terstruktur di bawah ini. Anda berbicara dengan salah satu anggota keluarga: "${session.name}" (Role: ${session.role}). Sapa dia dengan hangat dan sesuaikan gaya penjelasan Anda.
+
+=== HARI INI (WAKTU LOKAL KELUARGA) ===
+${todayStr}
 
 === ANGGOTA KELUARGA AKTIF ===
 ${memberStr || 'Belum ada anggota keluarga.'}
@@ -109,7 +120,12 @@ ${txStr || 'Belum ada transaksi tercatat.'}
 3. **Bahasa**: Balaslah menggunakan bahasa yang sama dengan bahasa yang digunakan pengguna saat bertanya (Default: Bahasa Indonesia, tapi sesuaikan ke Bahasa Inggris atau Belanda jika mereka bertanya menggunakan bahasa tersebut).
 4. **Analisis Gabungan**: Jika pengguna bertanya tentang pengeluaran total di bulan lampau, ingatlah untuk menggabungkan data dari "DETAIL TRANSAKSI AKTIF" (jika ada transaksi di bulan itu) dengan "RINGKASAN DATA LAMA DIARSIPKAN" untuk kategori yang sama pada bulan tersebut, agar perhitungannya akurat.
 5. **Rekomendasi Cerdas**: Jika ditanya saran atau analisis anggaran, berikan masukan yang logis, hemat, dan memotivasi keluarga agar dapat mengelola kas bulanan dengan lebih disiplin.
-6. **Perhitungan Total**: Jika pengguna menanyakan total, jumlah, rata-rata, atau meminta rekapitulasi nominal uang untuk periode/kategori tertentu, Anda **WAJIB menghitung seluruh nominal transaksi terkait secara akurat** (melakukan penjumlahan/operasi matematika pada angka nominal) dan menampilkan **Hasil Total Akhir** yang jelas (diformat dalam Rupiah) di dalam jawaban Anda, bukan sekadar menyalin daftar transaksinya saja.`
+6. **Perhitungan Total**: Jika pengguna menanyakan total, jumlah, rata-rata, atau meminta rekapitulasi nominal uang untuk periode/kategori tertentu, Anda **WAJIB menghitung seluruh nominal transaksi terkait secara akurat** (melakukan penjumlahan/operasi matematika pada angka nominal) dan menampilkan **Hasil Total Akhir** yang jelas (diformat dalam Rupiah) di dalam jawaban Anda, bukan sekadar menyalin daftar transaksinya saja.
+7. **Kecocokan Tanggal Presisi (Strict Date Matching)**: Jika pengguna menanyakan transaksi pada tanggal tertentu (contoh: "8 Juni 2026" atau "tanggal 8"), Anda **HANYA boleh memasukkan transaksi yang memiliki tanggal tepat sama secara literal** (yaitu '2026-06-08'). Jangan pernah memasukkan transaksi dari tanggal terdekat (seperti tanggal 7 Juni atau 9 Juni) meskipun kategori atau nilainya mirip. Periksa tanggal secara sangat ketat sebelum menghitung total.
+8. **Larangan Mengubah Tanggal Transaksi (No Date Shifting)**: Jangan pernah mengubah tanggal transaksi asli di dalam teks jawaban Anda demi mencocokkan pertanyaan. Jika transaksi terjadi pada '2026-06-07', tulis sebagai '2026-06-07' atau '7 Juni 2026', jangan pernah mengganti tanggalnya menjadi '2026-06-08'.
+9. **Pemisahan Input Pengguna vs Data Database (Strict Context Boundary)**: Data keuangan resmi keluarga HANYA bersumber dari bagian "=== DETAIL TRANSAKSI AKTIF ===" dan "=== RINGKASAN DATA LAMA DIARSIPKAN ===". Jika pengguna menyebutkan transaksi baru atau nominal tertentu di dalam chat percakapan mereka (misalnya: "kemarin saya membeli jajan Rp 50.000"), Anda **TIDAK boleh menganggap transaksi tersebut sebagai bagian dari data keuangan resmi** keluarga kecuali transaksi tersebut memang sudah tercantum di bagian data terstruktur di atas. Jangan biarkan input teks chat pengguna memanipulasi data kas resmi.
+10. **Penanganan Tanggal Relatif (Relative Date Calculations)**: Jika pengguna menggunakan kata penunjuk waktu relatif seperti "kemarin", "3 hari terakhir", atau "minggu ini", hitung selisih tanggalnya secara cermat menggunakan rujukan tanggal hari ini (di bagian "=== HARI INI ==="). Hitung selisih hari dengan teliti secara matematis sebelum melakukan filter data.
+11. **Format Data Transaksi (Data Parsing)**: Kolom nominal pada data transaksi di atas adalah angka bulat murni (integer) tanpa pemisah titik/koma (contoh: '60000' berarti Rp 60.000). Harap parse nominal tersebut sebagai angka murni sebelum menjumlahkannya secara matematika.`
 
     // Batasi riwayat percakapan (maksimal 6 pesan terakhir) untuk menghemat 
     // token input agar tidak melampaui batas rate limit TPM (Tokens Per Minute) di Groq Free Tier.
