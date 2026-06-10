@@ -153,7 +153,7 @@ export default function LoginPage() {
         </form>
 
         <p style={{ textAlign: 'center', marginTop: 24, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          {t('digital_cashbook')}
+          {t('digital_cashbook')} • {t('system_version')}
         </p>
       </div>
     </div>

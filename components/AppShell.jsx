@@ -89,7 +89,7 @@ export default function AppShell({ children }) {
             <div className="sidebar-logo-icon">💰</div>
             <div>
               <div className="sidebar-logo-text">{familyName}</div>
-              <div className="sidebar-logo-sub">{t('digital_cashbook')}</div>
+              <div className="sidebar-logo-sub">{t('digital_cashbook')} <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: 2 }}>({t('system_version')})</span></div>
             </div>
           </div>
         </div>
@@ -155,7 +155,10 @@ export default function AppShell({ children }) {
               width: 32, height: 32, background: 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700))',
               borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 16
             }}>💰</div>
-            <span style={{ fontWeight: 700, fontSize: '1rem' }}>{familyName}</span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: '1.2' }}>{familyName}</span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{t('system_version')}</span>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 5 }}>
             <button onClick={toggleTheme} className="btn-icon">
