@@ -54,6 +54,9 @@ model Transaction {
   // Relasi
   member Member? @relation("MemberTransactions", fields: [memberId], references: [id])
 
+  @@index([transactionDate])
+  @@index([category])
+  @@index([memberId])
   @@map("transactions")
 }
 

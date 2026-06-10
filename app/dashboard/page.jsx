@@ -1,12 +1,11 @@
 'use client'
 // app/dashboard/page.jsx - Dashboard Utama
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import AppShell from '@/components/AppShell'
-import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
-import { formatRupiah, formatDate, formatMonthYear, getMonthName, calcPercentage, getBudgetStatusColor, MONTH_NAMES } from '@/lib/format'
+import { formatRupiah, formatDate, formatMonthYear, getMonthName, getBudgetStatusColor, MONTH_NAMES } from '@/lib/format'
 import { getCategoryInfo } from '@/lib/constants'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -17,18 +16,13 @@ import Link from 'next/link'
 
 export default function DashboardPage() {
   const { t, language } = useLanguage()
-  const { user } = useUser()
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchDashboard()
-  }, [month, year])
-
-  async function fetchDashboard() {
+  const fetchDashboard = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch(`/api/dashboard?month=${month}&year=${year}`)
@@ -39,7 +33,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [month, year])
+
+  useEffect(() => {
+    fetchDashboard()
+  }, [fetchDashboard])
 
   const statusColor = data?.summary ? getBudgetStatusColor(data.summary.remaining, data.summary.totalBudget) : 'success'
   const pct = data?.summary ? data.summary.budgetPercentUsed : 0

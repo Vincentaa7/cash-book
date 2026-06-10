@@ -91,53 +91,60 @@ export async function GET(request) {
     cutoffDate.setDate(cutoffDate.getDate() - 90)
     cutoffDate.setHours(0, 0, 0, 0)
 
-    const monthlyTrends = []
+    // Siapkan list bulan yang akan di-query secara paralel
+    const monthsToQuery = []
     for (let i = 5; i >= 0; i--) {
       let m = month - i
       let y = year
       if (m <= 0) { m += 12; y -= 1 }
-      const mFirstDay = new Date(y, m - 1, 1)
-      const mLastDay = new Date(y, m, 0)
+      monthsToQuery.push({ m, y })
+    }
 
-      let expenseAmount = 0
+    // Eksekusi semua query secara paralel menggunakan Promise.all
+    const monthlyTrends = await Promise.all(
+      monthsToQuery.map(async ({ m, y }) => {
+        const mFirstDay = new Date(y, m - 1, 1)
+        const mLastDay = new Date(y, m, 0)
+        let expenseAmount = 0
 
-      // Cek apakah bulan ini sudah melewati cutoff (data mungkin sudah diarsip)
-      if (mLastDay < cutoffDate) {
-        // Ambil dari monthly_snapshots
-        const snapshotAgg = await prisma.monthlySnapshot.aggregate({
-          where: { month: m, year: y },
-          _sum: { totalAmount: true },
-        })
-        expenseAmount = Number(snapshotAgg._sum.totalAmount || 0)
+        // Cek apakah bulan ini sudah melewati cutoff (data mungkin sudah diarsip)
+        if (mLastDay < cutoffDate) {
+          // Ambil dari monthly_snapshots
+          const snapshotAgg = await prisma.monthlySnapshot.aggregate({
+            where: { month: m, year: y },
+            _sum: { totalAmount: true },
+          })
+          expenseAmount = Number(snapshotAgg._sum.totalAmount || 0)
 
-        // Jika snapshot kosong, coba fallback ke transactions (mungkin belum dicleanup)
-        if (expenseAmount === 0) {
-          const txAgg = await prisma.transaction.aggregate({
+          // Jika snapshot kosong, coba fallback ke transactions (mungkin belum dicleanup)
+          if (expenseAmount === 0) {
+            const txAgg = await prisma.transaction.aggregate({
+              where: { transactionDate: { gte: mFirstDay, lte: mLastDay } },
+              _sum: { amount: true },
+            })
+            expenseAmount = Number(txAgg._sum.amount || 0)
+          }
+        } else {
+          // Bulan masih dalam range 90 hari, ambil dari transactions
+          const mExpense = await prisma.transaction.aggregate({
             where: { transactionDate: { gte: mFirstDay, lte: mLastDay } },
             _sum: { amount: true },
           })
-          expenseAmount = Number(txAgg._sum.amount || 0)
+          expenseAmount = Number(mExpense._sum.amount || 0)
         }
-      } else {
-        // Bulan masih dalam range 90 hari, ambil dari transactions
-        const mExpense = await prisma.transaction.aggregate({
-          where: { transactionDate: { gte: mFirstDay, lte: mLastDay } },
-          _sum: { amount: true },
+
+        const mBudget = await prisma.monthlyBudget.findUnique({
+          where: { uq_month_year: { month: m, year: y } },
         })
-        expenseAmount = Number(mExpense._sum.amount || 0)
-      }
 
-      const mBudget = await prisma.monthlyBudget.findUnique({
-        where: { uq_month_year: { month: m, year: y } },
+        return {
+          month: m,
+          year: y,
+          expense: expenseAmount,
+          budget: mBudget ? Number(mBudget.amount) : 0,
+        }
       })
-
-      monthlyTrends.push({
-        month: m,
-        year: y,
-        expense: expenseAmount,
-        budget: mBudget ? Number(mBudget.amount) : 0,
-      })
-    }
+    )
 
     return NextResponse.json({
       summary: {

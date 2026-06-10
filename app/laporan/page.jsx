@@ -6,14 +6,14 @@ import AppShell from '@/components/AppShell'
 import { useLanguage } from '@/components/LanguageContext'
 import { useUser } from '@/components/UserContext'
 import CategoryBadge from '@/components/CategoryBadge'
-import { formatRupiah, formatDate, formatDateInput, formatMonthYear, getBudgetStatusColor, calcPercentage } from '@/lib/format'
+import { formatRupiah, formatDate, formatDateInput, formatMonthYear, calcPercentage } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo } from '@/lib/constants'
 import { Download, FileText, Filter } from 'lucide-react'
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts'
 
 export default function LaporanPage() {
   const { t, language } = useLanguage()
-  const { user } = useUser()
+  const { familyName } = useUser()
   const now = new Date()
   const [startDate, setStartDate] = useState(formatDateInput(new Date(now.getFullYear(), now.getMonth(), 1)))
   const [endDate, setEndDate] = useState(formatDateInput(now))
@@ -82,6 +82,39 @@ export default function LaporanPage() {
   const transactions = data?.transactions || []
   const totalExpense = transactions.reduce((s, t) => s + t.amount, 0)
 
+  // 1. Rata-rata per transaksi [NEW]
+  const avgTxAmount = transactions.length > 0 ? Math.round(totalExpense / transactions.length) : 0
+
+  // 2. Hari Terboros (Peak Day) [NEW]
+  const dayNamesID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+  const dayNamesEN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const dayNamesNL = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
+
+  const dayExpenses = Array(7).fill(0)
+  transactions.forEach(t => {
+    const d = new Date(t.transactionDate)
+    const dayIndex = d.getDay()
+    dayExpenses[dayIndex] += Number(t.amount)
+  })
+
+  let peakDayIndex = 0
+  let maxDayExpense = 0
+  dayExpenses.forEach((amt, idx) => {
+    if (amt > maxDayExpense) {
+      maxDayExpense = amt
+      peakDayIndex = idx
+    }
+  })
+
+  const getPeakDayName = () => {
+    if (maxDayExpense === 0) return '-'
+    if (language === 'en') return dayNamesEN[peakDayIndex]
+    if (language === 'nl') return dayNamesNL[peakDayIndex]
+    return dayNamesID[peakDayIndex]
+  }
+
+  const peakDayName = getPeakDayName()
+
   // Kategori breakdown
   const catMap = {}
   transactions.forEach(t => {
@@ -104,6 +137,17 @@ export default function LaporanPage() {
   return (
     <AppShell>
       <div className="page-container" id="laporan-print">
+        {/* Kop Surat Laporan Cetak Formal [NEW] */}
+        <div className="print-header-only" style={{ display: 'none' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: 6 }}>
+            LAPORAN KAS BUKU KELUARGA {familyName?.toUpperCase() || ''}
+          </h2>
+          <p style={{ fontSize: '0.85rem', color: '#475569', margin: '4px 0 16px' }}>
+            Periode: {formatDate(new Date(startDate), language)} s/d {formatDate(new Date(endDate), language)}
+          </p>
+          <div style={{ borderBottom: '2.5px double #000', marginBottom: 24 }} />
+        </div>
+
         <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <h1>{t('reports')} 📄</h1>
@@ -114,7 +158,7 @@ export default function LaporanPage() {
               <Download size={15} /> {t('actions')} CSV
             </button>
             <button className="btn btn-secondary btn-sm" onClick={handlePrint}>
-              <FileText size={15} /> {t('total')}
+              <FileText size={15} /> {t('print_report')}
             </button>
           </div>
         </div>
@@ -185,40 +229,124 @@ export default function LaporanPage() {
           </div>
         </div>
 
+        {/* Realisasi Anggaran Kas [NEW] */}
+        {budget && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header">
+              <h3 className="card-title">📊 {t('budget_vs_realization')} ({formatMonthYear(now.getMonth() + 1, now.getFullYear(), language)})</h3>
+            </div>
+            <div className="card-body">
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '0.9rem', flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('total_budget')}:</span>{' '}
+                  <strong style={{ fontSize: '1.05rem' }}>{formatRupiah(budget.amount)}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('total_expense')}:</span>{' '}
+                  <strong style={{ fontSize: '1.05rem', color: '#ef4444' }}>{formatRupiah(totalExpense)}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>{t('balance')}:</span>{' '}
+                  <strong style={{ fontSize: '1.05rem', color: budget.amount - totalExpense >= 0 ? '#10b981' : '#ef4444' }}>
+                    {formatRupiah(budget.amount - totalExpense)}
+                  </strong>
+                </div>
+              </div>
+              
+              {/* Progress bar */}
+              {(() => {
+                const pct = budget.amount > 0 ? Math.round((totalExpense / budget.amount) * 100) : 0
+                const barColor = pct <= 75 ? '#10b981' : pct <= 95 ? '#f59e0b' : '#ef4444'
+                return (
+                  <div>
+                    <div className="progress-bar" style={{ height: 10 }}>
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${Math.min(100, pct)}%`, background: barColor, height: '100%', borderRadius: 99 }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      <span>{pct}% Terpakai</span>
+                      <span>{pct > 100 ? 'Overbudget!' : `${100 - pct}% Tersisa`}</span>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="loading-container"><div className="spinner" /><p>{t('loading')}</p></div>
         ) : (
           <>
             {/* Summary */}
-            <div className="summary-grid" style={{ marginBottom: 24 }}>
-                <div className="summary-card teal">
+            <div className="summary-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+              {/* Card 1: Total Transaksi */}
+              <div className="summary-card teal">
                 <div className="summary-card-icon" style={{ background: '#ccfbf1' }}>📊</div>
                 <div className="summary-card-label">{t('history')}</div>
                 <div className="summary-card-value">{transactions.length}</div>
-                <div className="summary-card-sub">{startDate} {t('total').toLowerCase()} {endDate}</div>
+                <div className="summary-card-sub">{startDate} s/d {endDate}</div>
               </div>
+
+              {/* Card 2: Total Pengeluaran */}
               <div className="summary-card red">
                 <div className="summary-card-icon" style={{ background: '#fee2e2' }}>💸</div>
                 <div className="summary-card-label">{t('total_expense')}</div>
                 <div className="summary-card-value">{formatRupiah(totalExpense)}</div>
                 <div className="summary-card-sub">{t('digital_cashbook')}</div>
               </div>
-              {catBreakdown[0] && (
-                <div className="summary-card yellow">
+
+              {/* Card 3: Rata-rata per Transaksi */}
+              <div className="summary-card yellow">
+                <div className="summary-card-icon" style={{ background: '#fef9c3' }}>🧮</div>
+                <div className="summary-card-label">{t('avg_transaction')}</div>
+                <div className="summary-card-value">{formatRupiah(avgTxAmount)}</div>
+                <div className="summary-card-sub">Per transaksi dicatat</div>
+              </div>
+
+              {/* Card 4: Hari Terboros */}
+              <div className="summary-card orange">
+                <div className="summary-card-icon" style={{ background: '#ffedd5' }}>📅</div>
+                <div className="summary-card-label">{t('most_expensive_day')}</div>
+                <div className="summary-card-value" style={{ fontSize: '1.45rem' }}>{peakDayName}</div>
+                <div className="summary-card-sub">{maxDayExpense > 0 ? `Total: ${formatRupiah(maxDayExpense)}` : 'Belum ada data'}</div>
+              </div>
+
+              {/* Card 5: Kategori Terboros */}
+              {catBreakdown[0] ? (
+                <div className="summary-card yellow" style={{ borderTop: '3px solid var(--color-warning)' }}>
                   <div className="summary-card-icon" style={{ background: '#fef9c3' }}>🏆</div>
-                  <div className="summary-card-label">{t('highest_expense')}</div>
-                  <div className="summary-card-value" style={{ fontSize: '1.1rem' }}>
-                    {getCategoryInfo(catBreakdown[0].category).emoji} {t(getCategoryInfo(catBreakdown[0].category).labelKey).split(' ')[0]}
+                  <div className="summary-card-label">{t('highest_expense')} ({t('category').split(' ')[0]})</div>
+                  <div className="summary-card-value" style={{ fontSize: '1.15rem' }}>
+                    {getCategoryInfo(catBreakdown[0].category).emoji} {t(getCategoryInfo(catBreakdown[0].category).labelKey)}
                   </div>
                   <div className="summary-card-sub">{formatRupiah(catBreakdown[0].amount)}</div>
                 </div>
+              ) : (
+                <div className="summary-card yellow">
+                  <div className="summary-card-icon" style={{ background: '#fef9c3' }}>🏆</div>
+                  <div className="summary-card-label">{t('highest_expense')}</div>
+                  <div className="summary-card-value">-</div>
+                  <div className="summary-card-sub">Belum ada data</div>
+                </div>
               )}
-              {memberBreakdown[0] && (
+
+              {/* Card 6: Anggota Terboros */}
+              {memberBreakdown[0] ? (
+                <div className="summary-card" style={{ borderTop: '3px solid #8b5cf6' }}>
+                  <div className="summary-card-icon" style={{ background: '#ede9fe' }}>👤</div>
+                  <div className="summary-card-label">{t('highest_expense')} ({t('member_name').split(' ')[0]})</div>
+                  <div className="summary-card-value" style={{ fontSize: '1.3rem' }}>{memberBreakdown[0].name}</div>
+                  <div className="summary-card-sub">{formatRupiah(memberBreakdown[0].amount)}</div>
+                </div>
+              ) : (
                 <div className="summary-card" style={{ borderTop: '3px solid #8b5cf6' }}>
                   <div className="summary-card-icon" style={{ background: '#ede9fe' }}>👤</div>
                   <div className="summary-card-label">{t('highest_expense')}</div>
-                  <div className="summary-card-value" style={{ fontSize: '1.2rem' }}>{memberBreakdown[0].name}</div>
-                  <div className="summary-card-sub">{formatRupiah(memberBreakdown[0].amount)}</div>
+                  <div className="summary-card-value">-</div>
+                  <div className="summary-card-sub">Belum ada data</div>
                 </div>
               )}
             </div>
@@ -367,9 +495,68 @@ export default function LaporanPage() {
       {/* Print styles */}
       <style>{`
         @media print {
-          .sidebar, .bottom-nav, .btn { display: none !important; }
-          .main-content { margin-left: 0 !important; }
-          .card { break-inside: avoid; }
+          /* Sembunyikan navigasi, sidebar, tombol-tombol, dan panel filter */
+          .sidebar, .bottom-nav, .btn, .mobile-header, .filter-bar, .card-header button, .ai-chat-widget { 
+            display: none !important; 
+          }
+          
+          /* Atur layout halaman cetak */
+          .main-content { 
+            margin-left: 0 !important; 
+            padding: 0 !important;
+            background: white !important;
+            color: black !important;
+          }
+          
+          .page-container { 
+            padding: 0 !important; 
+            max-width: 100% !important;
+          }
+          
+          /* Tampilkan Kop Surat Cetak */
+          .print-header-only { 
+            display: block !important; 
+          }
+          
+          /* Hilangkan style card agar menyatu di kertas print */
+          .card { 
+            border: none !important; 
+            box-shadow: none !important; 
+            margin-bottom: 20px !important;
+            background: transparent !important;
+            break-inside: avoid;
+          }
+          
+          .card-body {
+            padding: 0 !important;
+          }
+          
+          /* Atur tabel agar terlihat formal hitam-putih */
+          .table-container {
+            border: 1px solid #000 !important;
+            border-radius: 0 !important;
+          }
+          
+          .table {
+            border-collapse: collapse !important;
+          }
+          
+          .table th {
+            background: #f1f5f9 !important;
+            color: #000 !important;
+            border-bottom: 2px solid #000 !important;
+            font-weight: 700 !important;
+          }
+          
+          .table td {
+            border-bottom: 1px solid #cbd5e1 !important;
+            color: #000 !important;
+          }
+          
+          .table tfoot td {
+            border-top: 2px solid #000 !important;
+            font-weight: 800 !important;
+          }
         }
       `}</style>
     </AppShell>
