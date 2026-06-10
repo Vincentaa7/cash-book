@@ -41,8 +41,8 @@ export default function DashboardPage() {
     }
   }
 
-  const statusColor = data ? getBudgetStatusColor(data.summary.remaining, data.summary.totalBudget) : 'success'
-  const pct = data ? data.summary.budgetPercentUsed : 0
+  const statusColor = data?.summary ? getBudgetStatusColor(data.summary.remaining, data.summary.totalBudget) : 'success'
+  const pct = data?.summary ? data.summary.budgetPercentUsed : 0
 
   // Warna donut chart
   const PIE_COLORS = ['#0d9488', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#10b981', '#f97316', '#06b6d4', '#94a3b8']
@@ -115,7 +115,7 @@ export default function DashboardPage() {
         ) : (
           <>
             {/* Budget warning */}
-            {data?.summary.totalBudget === 0 && (
+            {data?.summary?.totalBudget === 0 && (
               <div className="alert alert-info" style={{ marginBottom: 24 }}>
                 <Info size={16} />
                 <span>
@@ -127,7 +127,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {statusColor === 'danger' && data?.summary.totalBudget > 0 && (
+            {statusColor === 'danger' && data?.summary?.totalBudget > 0 && (
               <div className="alert alert-danger" style={{ marginBottom: 24 }}>
                 <AlertTriangle size={16} />
                 <span>
@@ -150,16 +150,16 @@ export default function DashboardPage() {
               <div className="summary-card teal">
                 <div className="summary-card-icon" style={{ background: '#ccfbf1' }}>💵</div>
                 <div className="summary-card-label">{t('total_budget')}</div>
-                <div className="summary-card-value">{formatRupiah(data?.summary.totalBudget || 0)}</div>
+                <div className="summary-card-value">{formatRupiah(data?.summary?.totalBudget || 0)}</div>
                 <div className="summary-card-sub">{formatMonthYear(month, year, language)}</div>
               </div>
 
               <div className="summary-card red">
                 <div className="summary-card-icon" style={{ background: '#fee2e2' }}>💸</div>
                 <div className="summary-card-label">{t('total_expense')}</div>
-                <div className="summary-card-value">{formatRupiah(data?.summary.totalExpense || 0)}</div>
-                <div className="summary-card-sub">{data?.summary.budgetPercentUsed || 0}% {t('expense_ratio')}</div>
-                {data?.summary.totalBudget > 0 && (
+                <div className="summary-card-value">{formatRupiah(data?.summary?.totalExpense || 0)}</div>
+                <div className="summary-card-sub">{data?.summary?.budgetPercentUsed || 0}% {t('expense_ratio')}</div>
+                {data?.summary?.totalBudget > 0 && (
                   <div className="progress-bar">
                     <div
                       className={`progress-fill ${statusColor}`}
@@ -175,10 +175,10 @@ export default function DashboardPage() {
                 </div>
                 <div className="summary-card-label">{t('balance')}</div>
                 <div className={`summary-card-value ${statusColor}`}>
-                  {formatRupiah(data?.summary.remaining || 0)}
+                  {formatRupiah(data?.summary?.remaining || 0)}
                 </div>
                 <div className="summary-card-sub">
-                  {data?.summary.totalBudget > 0
+                  {data?.summary?.totalBudget > 0
                     ? `${t('success')}: ${100 - Math.min(100, pct)}%`
                     : t('set_budget_first')}
                 </div>
@@ -187,7 +187,7 @@ export default function DashboardPage() {
               <div className="summary-card yellow">
                 <div className="summary-card-icon" style={{ background: '#fef9c3' }}>📈</div>
                 <div className="summary-card-label">{t('daily_avg')}</div>
-                <div className="summary-card-value">{formatRupiah(data?.summary.avgPerDay || 0)}</div>
+                <div className="summary-card-value">{formatRupiah(data?.summary?.avgPerDay || 0)}</div>
                 <div className="summary-card-sub">{t('digital_cashbook')}</div>
               </div>
             </div>

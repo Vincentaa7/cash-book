@@ -13,6 +13,7 @@ import { getInitials } from '@/lib/constants'
 import { useLanguage } from '@/components/LanguageContext'
 import { useUser } from '@/components/UserContext'
 import CarryOverModal from '@/components/CarryOverModal'
+import AiChatWidget from '@/components/AiChatWidget'
 
 const NAV_ITEMS = [
   { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
@@ -232,6 +233,9 @@ export default function AppShell({ children }) {
           }}
         />
       )}
+
+      {/* AI Assistant Floating Chat Widget */}
+      <AiChatWidget />
     </div>
   )
 }
