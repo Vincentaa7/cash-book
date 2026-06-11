@@ -6,7 +6,7 @@ import AppShell from '@/components/AppShell'
 import { useLanguage } from '@/components/LanguageContext'
 import { useUser } from '@/components/UserContext'
 import CategoryBadge from '@/components/CategoryBadge'
-import { formatRupiah, formatDate, formatDateInput, formatMonthYear, calcPercentage } from '@/lib/format'
+import { formatRupiah, formatDate, formatMonthYear, calcPercentage } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo } from '@/lib/constants'
 import { Download, FileText, Filter } from 'lucide-react'
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts'
@@ -14,26 +14,65 @@ import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recha
 export default function LaporanPage() {
   const { t, language } = useLanguage()
   const { familyName } = useUser()
-  const now = new Date()
-  const [startDate, setStartDate] = useState(formatDateInput(new Date(now.getFullYear(), now.getMonth(), 1)))
-  const [endDate, setEndDate] = useState(formatDateInput(now))
+
+  // Helper untuk zona waktu Asia/Jakarta yang aman dari hydration mismatch & shift
+  const getJakartaDateParts = (date = new Date()) => {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Jakarta',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    })
+    const parts = formatter.formatToParts(date)
+    const partMap = {}
+    parts.forEach(p => { partMap[p.type] = parseInt(p.value, 10) })
+    return {
+      year: partMap.year,
+      month: partMap.month,
+      day: partMap.day,
+    }
+  }
+
+  const formatJakartaYMD = (y, m, d) => {
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  }
+
+  const todayParts = getJakartaDateParts()
+  const todayStr = formatJakartaYMD(todayParts.year, todayParts.month, todayParts.day)
+
+  const [startDate, setStartDate] = useState(formatJakartaYMD(todayParts.year, todayParts.month, 1))
+  const [endDate, setEndDate] = useState(todayStr)
   const [memberId, setMemberId] = useState('')
   const [category, setCategory] = useState('')
   const [data, setData] = useState(null)
-  const [budget, setBudget] = useState(null)
+  const [dashboardSummary, setDashboardSummary] = useState(null)
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     fetch('/api/members').then(r => r.json()).then(d => setMembers(d.members || []))
-    fetchBudget()
   }, [])
 
-  async function fetchBudget() {
-    const res = await fetch(`/api/budget?month=${now.getMonth() + 1}&year=${now.getFullYear()}`)
-    const d = await res.json()
-    setBudget(d.budget)
+  async function fetchSummaryForMonth(m, y) {
+    try {
+      const res = await fetch(`/api/dashboard?month=${m}&year=${y}`)
+      const d = await res.json()
+      setDashboardSummary(d.summary)
+    } catch {}
   }
+
+  useEffect(() => {
+    if (endDate) {
+      const parts = endDate.split('-')
+      if (parts.length >= 2) {
+        const year = parseInt(parts[0], 10)
+        const month = parseInt(parts[1], 10)
+        if (!isNaN(year) && !isNaN(month)) {
+          fetchSummaryForMonth(month, year)
+        }
+      }
+    }
+  }, [endDate])
 
   async function handleSearch() {
     setLoading(true)
@@ -55,18 +94,40 @@ export default function LaporanPage() {
   useEffect(() => { handleSearch() }, [startDate, endDate, memberId, category])
 
   function applyPreset(preset) {
-    const today = new Date()
-    const fmt = formatDateInput
     switch (preset) {
-      case '7days':
-        setStartDate(fmt(new Date(today - 7 * 86400000))); setEndDate(fmt(today)); break
-      case '30days':
-        setStartDate(fmt(new Date(today - 30 * 86400000))); setEndDate(fmt(today)); break
-      case 'this_month':
-        setStartDate(fmt(new Date(today.getFullYear(), today.getMonth(), 1))); setEndDate(fmt(today)); break
-      case 'last_month':
-        setStartDate(fmt(new Date(today.getFullYear(), today.getMonth() - 1, 1)))
-        setEndDate(fmt(new Date(today.getFullYear(), today.getMonth(), 0))); break
+      case '7days': {
+        const d = new Date()
+        d.setDate(d.getDate() - 7)
+        const parts = getJakartaDateParts(d)
+        setStartDate(formatJakartaYMD(parts.year, parts.month, parts.day))
+        setEndDate(todayStr)
+        break
+      }
+      case '30days': {
+        const d = new Date()
+        d.setDate(d.getDate() - 30)
+        const parts = getJakartaDateParts(d)
+        setStartDate(formatJakartaYMD(parts.year, parts.month, parts.day))
+        setEndDate(todayStr)
+        break
+      }
+      case 'this_month': {
+        setStartDate(formatJakartaYMD(todayParts.year, todayParts.month, 1))
+        setEndDate(todayStr)
+        break
+      }
+      case 'last_month': {
+        let lastMonth = todayParts.month - 1
+        let lastMonthYear = todayParts.year
+        if (lastMonth === 0) {
+          lastMonth = 12
+          lastMonthYear -= 1
+        }
+        const getDaysInMonth = (y, m) => new Date(y, m, 0).getDate()
+        setStartDate(formatJakartaYMD(lastMonthYear, lastMonth, 1))
+        setEndDate(formatJakartaYMD(lastMonthYear, lastMonth, getDaysInMonth(lastMonthYear, lastMonth)))
+        break
+      }
     }
   }
 
@@ -133,6 +194,17 @@ export default function LaporanPage() {
   const memberBreakdown = Object.entries(memberMap)
     .map(([name, amt]) => ({ name, amount: amt }))
     .sort((a, b) => b.amount - a.amount)
+
+  const getSelectedMonthYear = () => {
+    if (!endDate) return { month: todayParts.month, year: todayParts.year }
+    const parts = endDate.split('-')
+    if (parts.length < 2) return { month: todayParts.month, year: todayParts.year }
+    const year = parseInt(parts[0], 10)
+    const month = parseInt(parts[1], 10)
+    if (isNaN(year) || isNaN(month)) return { month: todayParts.month, year: todayParts.year }
+    return { month, year }
+  }
+  const { month: selectedMonth, year: selectedYear } = getSelectedMonthYear()
 
   return (
     <AppShell>
@@ -230,32 +302,32 @@ export default function LaporanPage() {
         </div>
 
         {/* Realisasi Anggaran Kas [NEW] */}
-        {budget && (
+        {dashboardSummary && (
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
-              <h3 className="card-title">📊 {t('budget_vs_realization')} ({formatMonthYear(now.getMonth() + 1, now.getFullYear(), language)})</h3>
+              <h3 className="card-title">📊 {t('budget_vs_realization')} ({formatMonthYear(selectedMonth, selectedYear, language)})</h3>
             </div>
             <div className="card-body">
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '0.9rem', flexWrap: 'wrap', gap: 10 }}>
                 <div>
                   <span style={{ color: 'var(--text-secondary)' }}>{t('total_budget')}:</span>{' '}
-                  <strong style={{ fontSize: '1.05rem' }}>{formatRupiah(budget.amount)}</strong>
+                  <strong style={{ fontSize: '1.05rem' }}>{formatRupiah(dashboardSummary.totalBudget)}</strong>
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-secondary)' }}>{t('total_expense')}:</span>{' '}
-                  <strong style={{ fontSize: '1.05rem', color: '#ef4444' }}>{formatRupiah(totalExpense)}</strong>
+                  <strong style={{ fontSize: '1.05rem', color: '#ef4444' }}>{formatRupiah(dashboardSummary.totalExpense)}</strong>
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-secondary)' }}>{t('balance')}:</span>{' '}
-                  <strong style={{ fontSize: '1.05rem', color: budget.amount - totalExpense >= 0 ? '#10b981' : '#ef4444' }}>
-                    {formatRupiah(budget.amount - totalExpense)}
+                  <strong style={{ fontSize: '1.05rem', color: dashboardSummary.remaining >= 0 ? '#10b981' : '#ef4444' }}>
+                    {formatRupiah(dashboardSummary.remaining)}
                   </strong>
                 </div>
               </div>
               
               {/* Progress bar */}
               {(() => {
-                const pct = budget.amount > 0 ? Math.round((totalExpense / budget.amount) * 100) : 0
+                const pct = dashboardSummary.budgetPercentUsed
                 const barColor = pct <= 75 ? '#10b981' : pct <= 95 ? '#f59e0b' : '#ef4444'
                 return (
                   <div>
