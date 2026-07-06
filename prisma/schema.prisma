@@ -42,14 +42,17 @@ model MonthlyBudget {
 }
 
 model Transaction {
-  id              String   @id @default(uuid()) @db.Char(36)
-  itemName        String   @map("item_name") @db.VarChar(255)
-  amount          BigInt   // dalam Rupiah
-  category        String   @db.VarChar(100)
-  transactionDate DateTime @map("transaction_date") @db.Date
-  notes           String?  @db.Text
-  memberId        String?  @map("member_id") @db.Char(36)
-  createdAt       DateTime @default(now()) @map("created_at")
+  id              String    @id @default(uuid()) @db.Char(36)
+  itemName        String    @map("item_name") @db.VarChar(255)
+  amount          BigInt    // dalam Rupiah
+  category        String    @db.VarChar(100)
+  transactionDate DateTime  @map("transaction_date") @db.Date
+  notes           String?   @db.Text
+  memberId        String?   @map("member_id") @db.Char(36)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime? @updatedAt @map("updated_at")
+  editedById      String?   @map("edited_by_id") @db.Char(36)
+  editedByName    String?   @map("edited_by_name") @db.VarChar(100)
 
   // Relasi
   member Member? @relation("MemberTransactions", fields: [memberId], references: [id])

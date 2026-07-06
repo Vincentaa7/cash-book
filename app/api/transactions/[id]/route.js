@@ -40,6 +40,8 @@ export async function PUT(request, { params }) {
         category,
         transactionDate: new Date(transactionDate),
         notes: notes || null,
+        editedById: session.id,
+        editedByName: session.name,
       },
       include: {
         member: { select: { id: true, name: true, avatarColor: true } },

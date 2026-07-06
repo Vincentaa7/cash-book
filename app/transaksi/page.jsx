@@ -6,7 +6,7 @@ import AppShell from '@/components/AppShell'
 import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
-import { formatRupiah, formatDate, formatDateInput } from '@/lib/format'
+import { formatRupiah, formatDate, formatDateInput, formatTime } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo, getInitials } from '@/lib/constants'
 import { Search, Download, Edit2, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
@@ -308,55 +308,70 @@ export default function TransaksiPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map(t => {
-                    const isOwner = t.memberId === userId
+                  {transactions.map(tx => {
+                    const isOwner = tx.memberId === userId
                     const isAdmin = userRole === 'admin'
-                    const within24h = (Date.now() - new Date(t.createdAt).getTime()) < 86400000
+                    const within24h = (Date.now() - new Date(tx.createdAt).getTime()) < 86400000
                     const canEdit = isAdmin || (isOwner && within24h)
                     const canDelete = isAdmin
 
                     return (
-                      <tr key={t.id}>
+                      <tr key={tx.id}>
                         <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>
-                          {formatDate(t.transactionDate, language)}
+                          {formatDate(tx.transactionDate, language)}
                         </td>
                         <td>
-                          <div style={{ fontWeight: 500 }}>{t.itemName}</div>
+                          <div style={{ fontWeight: 500 }}>{tx.itemName}</div>
                           <div className="show-on-mobile" style={{ fontSize: '0.75rem', marginTop: 2 }}>
-                            <CategoryBadge category={t.category} size="xs" />
+                            <CategoryBadge category={tx.category} size="xs" />
                           </div>
-                          {t.notes && (
+                          {tx.notes && (
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                              📝 {t.notes}
+                              📝 {tx.notes}
+                            </div>
+                          )}
+                          {tx.updatedAt && tx.editedByName && (
+                            <div style={{
+                              fontSize: '0.68rem',
+                              color: '#f59e0b',
+                              marginTop: 4,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 3,
+                              flexWrap: 'wrap',
+                            }}>
+                              ✏️ <span style={{ fontWeight: 600 }}>{t('last_edited')}: {tx.editedByName}</span>
+                              <span style={{ opacity: 0.7 }}>·</span>
+                              <span style={{ opacity: 0.85 }}>{formatDate(tx.updatedAt, language)} {formatTime(tx.updatedAt, language)}</span>
                             </div>
                           )}
                         </td>
-                        <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
+                        <td className="hide-on-mobile"><CategoryBadge category={tx.category} size="sm" /></td>
                         <td style={{ fontWeight: 700, color: '#ef4444', textAlign: 'right', fontSize: '0.85rem' }}>
-                          {formatRupiah(t.amount)}
+                          {formatRupiah(tx.amount)}
                         </td>
                         <td className="hide-on-mobile">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{
                               width: 28, height: 28, borderRadius: '50%',
-                              background: t.member?.avatarColor || '#0d9488',
+                              background: tx.member?.avatarColor || '#0d9488',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               color: 'white', fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
                             }}>
-                              {getInitials(t.member?.name || '?')}
+                              {getInitials(tx.member?.name || '?')}
                             </div>
-                            <span style={{ fontSize: '0.85rem' }}>{t.member?.name || '-'}</span>
+                            <span style={{ fontSize: '0.85rem' }}>{tx.member?.name || '-'}</span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                             {canEdit && (
-                              <button className="btn-icon" onClick={() => openEdit(t)} title="Edit">
+                              <button className="btn-icon" onClick={() => openEdit(tx)} title="Edit">
                                 <Edit2 size={14} />
                               </button>
                             )}
                             {canDelete && (
-                              <button className="btn-icon" onClick={() => setDeleteTx(t)} title="Hapus" style={{ color: '#ef4444' }}>
+                              <button className="btn-icon" onClick={() => setDeleteTx(tx)} title="Hapus" style={{ color: '#ef4444' }}>
                                 <Trash2 size={14} />
                               </button>
                             )}
