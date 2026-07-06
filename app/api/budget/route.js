@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { logActivity } from '@/lib/logger'
+import { formatRupiah } from '@/lib/format'
 
 export async function GET(request) {
   try {
@@ -77,6 +79,14 @@ export async function POST(request) {
           createdBy: session.id,
         },
       })
+
+      // Catat log aktivitas tambah kas
+      await logActivity({
+        action: 'BUDGET_UPDATE',
+        description: `${session.name} menambah kas bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}`,
+        details: { month: parsedMonth, year: parsedYear, amount, action, total: Number(budget.amount) },
+        memberId: session.id,
+      })
     } else {
       // Upsert: update jika ada, create jika belum
       budget = await prisma.monthlyBudget.upsert({
@@ -91,6 +101,14 @@ export async function POST(request) {
           amount: parsedAmount,
           createdBy: session.id,
         },
+      })
+
+      // Catat log aktivitas set kas utama
+      await logActivity({
+        action: 'BUDGET_UPDATE',
+        description: `${session.name} menetapkan kas utama bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}`,
+        details: { month: parsedMonth, year: parsedYear, amount, action },
+        memberId: session.id,
       })
     }
 

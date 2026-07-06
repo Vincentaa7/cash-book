@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { logActivity } from '@/lib/logger'
 
 export async function GET() {
   try {
@@ -67,6 +68,14 @@ export async function POST(request) {
         avatarColor: avatarColor || '#0d9488',
       },
       select: { id: true, name: true, role: true, avatarColor: true, isActive: true },
+    })
+
+    // Catat log aktivitas tambah anggota
+    await logActivity({
+      action: 'MEMBER_CREATE',
+      description: `${session.name} menambah anggota keluarga baru bernama "${name}" dengan role "${role || 'member'}"`,
+      details: { id: member.id, name, role: role || 'member' },
+      memberId: session.id,
     })
 
     return NextResponse.json({ member }, { status: 201 })

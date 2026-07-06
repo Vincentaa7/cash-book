@@ -22,6 +22,7 @@ model Member {
   // Relasi
   transactions   Transaction[]   @relation("MemberTransactions")
   budgets        MonthlyBudget[] @relation("MemberBudgets")
+  activityLogs   ActivityLog[]   @relation("MemberActivityLogs")
 
   @@map("members")
 }
@@ -85,4 +86,18 @@ model MonthlySnapshot {
 
   @@unique([month, year, category], name: "uq_snapshot")
   @@map("monthly_snapshots")
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid()) @db.Char(36)
+  action      String   @db.VarChar(50) // 'TRANSACTION_CREATE', 'TRANSACTION_UPDATE', 'TRANSACTION_DELETE', 'BUDGET_UPDATE', 'MEMBER_CREATE', 'MEMBER_TOGGLE_ACTIVE'
+  description String   @db.Text
+  details     String?  @db.Text        // JSON string
+  memberId    String?  @map("member_id") @db.Char(36)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  member Member? @relation("MemberActivityLogs", fields: [memberId], references: [id])
+
+  @@index([memberId])
+  @@map("activity_logs")
 }

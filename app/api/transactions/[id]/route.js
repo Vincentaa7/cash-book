@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { logActivity } from '@/lib/logger'
+import { formatRupiah } from '@/lib/format'
 
 export async function PUT(request, { params }) {
   try {
@@ -48,6 +50,30 @@ export async function PUT(request, { params }) {
       },
     })
 
+    // Catat log aktivitas edit
+    await logActivity({
+      action: 'TRANSACTION_UPDATE',
+      description: `${session.name} mengubah transaksi "${transaction.itemName}" (${formatRupiah(transaction.amount)}) menjadi "${itemName}" (${formatRupiah(amount)})`,
+      details: {
+        id,
+        old: {
+          itemName: transaction.itemName,
+          amount: Number(transaction.amount),
+          category: transaction.category,
+          transactionDate: transaction.transactionDate.toISOString().split('T')[0],
+          notes: transaction.notes,
+        },
+        new: {
+          itemName,
+          amount,
+          category,
+          transactionDate,
+          notes,
+        },
+      },
+      memberId: session.id,
+    })
+
     return NextResponse.json({
       transaction: { ...updated, amount: Number(updated.amount) },
     })
@@ -65,7 +91,30 @@ export async function DELETE(request, { params }) {
     }
 
     const { id } = await params
+    const transaction = await prisma.transaction.findUnique({
+      where: { id },
+    })
+
+    if (!transaction) {
+      return NextResponse.json({ error: 'Transaksi tidak ditemukan' }, { status: 404 })
+    }
+
     await prisma.transaction.delete({ where: { id } })
+
+    // Catat log aktivitas hapus
+    await logActivity({
+      action: 'TRANSACTION_DELETE',
+      description: `${session.name} menghapus transaksi "${transaction.itemName}" sebesar ${formatRupiah(transaction.amount)}`,
+      details: {
+        id,
+        itemName: transaction.itemName,
+        amount: Number(transaction.amount),
+        category: transaction.category,
+        transactionDate: transaction.transactionDate.toISOString().split('T')[0],
+        notes: transaction.notes,
+      },
+      memberId: session.id,
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

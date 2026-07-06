@@ -6,10 +6,10 @@ import AppShell from '@/components/AppShell'
 import { useLanguage } from '@/components/LanguageContext'
 import { useUser } from '@/components/UserContext'
 import CategoryBadge from '@/components/CategoryBadge'
-import { formatRupiah, formatDate, formatMonthYear, calcPercentage } from '@/lib/format'
+import { formatRupiah, formatDate, formatMonthYear, calcPercentage, formatNumber } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo } from '@/lib/constants'
 import { Download, FileText, Filter } from 'lucide-react'
-import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis } from 'recharts'
 
 export default function LaporanPage() {
   const { t, language } = useLanguage()
@@ -46,6 +46,7 @@ export default function LaporanPage() {
   const [category, setCategory] = useState('')
   const [data, setData] = useState(null)
   const [dashboardSummary, setDashboardSummary] = useState(null)
+  const [compareData, setCompareData] = useState(null)
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -61,6 +62,14 @@ export default function LaporanPage() {
     } catch {}
   }
 
+  async function fetchComparison(m, y) {
+    try {
+      const res = await fetch(`/api/laporan/compare?month=${m}&year=${y}`)
+      const d = await res.json()
+      setCompareData(d)
+    } catch {}
+  }
+
   useEffect(() => {
     if (endDate) {
       const parts = endDate.split('-')
@@ -69,6 +78,7 @@ export default function LaporanPage() {
         const month = parseInt(parts[1], 10)
         if (!isNaN(year) && !isNaN(month)) {
           fetchSummaryForMonth(month, year)
+          fetchComparison(month, year)
         }
       }
     }
@@ -209,15 +219,145 @@ export default function LaporanPage() {
   return (
     <AppShell>
       <div className="page-container" id="laporan-print">
-        {/* Kop Surat Laporan Cetak Formal [NEW] */}
-        <div className="print-header-only" style={{ display: 'none' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: 6 }}>
-            LAPORAN KAS BUKU KELUARGA {familyName?.toUpperCase() || ''}
-          </h2>
-          <p style={{ fontSize: '0.85rem', color: '#475569', margin: '4px 0 16px' }}>
-            Periode: {formatDate(new Date(startDate), language)} s/d {formatDate(new Date(endDate), language)}
-          </p>
-          <div style={{ borderBottom: '2.5px double #000', marginBottom: 24 }} />
+        {/* Print-Only: Tata Letak Laporan Formal */}
+        <div className="print-only-layout" style={{ display: 'none' }}>
+          {/* Kop Surat Resmi */}
+          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, textTransform: 'uppercase', margin: '0 0 4px 0', letterSpacing: '0.5px' }}>
+              LAPORAN KEUANGAN KELUARGA
+            </h2>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, textTransform: 'uppercase', margin: '0 0 8px 0', color: '#1e293b' }}>
+              Buku Kas Keluarga: {familyName?.toUpperCase() || ''}
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: '#475569', margin: '0 0 16px 0' }}>
+              Periode: {formatDate(new Date(startDate), language)} s/d {formatDate(new Date(endDate), language)}
+            </p>
+            <div style={{ borderBottom: '2.5px double #000', marginTop: 8, marginBottom: 24 }} />
+          </div>
+
+          {/* I. Ringkasan Anggaran Kas */}
+          {dashboardSummary && (
+            <div style={{ marginBottom: 24, breakInside: 'avoid' }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '0 0 8px 0', textTransform: 'uppercase', borderBottom: '1.5px solid #000', paddingBottom: 4 }}>
+                I. RINGKASAN ANGGARAN KAS
+              </h4>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: 16 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #000', background: '#f1f5f9' }}>
+                    <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700 }}>Parameter Keuangan</th>
+                    <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700 }}>Nominal (Rupiah)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #cbd5e1' }}>
+                    <td style={{ padding: '6px 8px' }}>Total Alokasi Kas (Budget)</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{formatRupiah(dashboardSummary.totalBudget)}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #cbd5e1' }}>
+                    <td style={{ padding: '6px 8px' }}>Total Realisasi Pengeluaran</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>{formatRupiah(dashboardSummary.totalExpense)}</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #000', fontWeight: 700, background: '#f8fafc' }}>
+                    <td style={{ padding: '6px 8px' }}>Sisa Saldo Kas</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', color: dashboardSummary.remaining >= 0 ? '#16a34a' : '#ef4444' }}>
+                      {formatRupiah(dashboardSummary.remaining)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* II. Rincian Pengeluaran per Kategori */}
+          <div style={{ marginBottom: 24, breakInside: 'avoid' }}>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '0 0 8px 0', textTransform: 'uppercase', borderBottom: '1.5px solid #000', paddingBottom: 4 }}>
+              II. RINCIAN PENGELUARAN PER KATEGORI
+            </h4>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: 16 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #000', background: '#f1f5f9' }}>
+                  <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700 }}>Kategori Pengeluaran</th>
+                  <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700 }}>Total Pengeluaran</th>
+                  <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 700 }}>Persentase (%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catBreakdown.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'center', padding: '8px', color: '#64748b' }}>Tidak ada pengeluaran pada periode ini.</td>
+                  </tr>
+                ) : (
+                  catBreakdown.map(({ category: cat, amount }) => {
+                    const info = getCategoryInfo(cat)
+                    return (
+                      <tr key={cat} style={{ borderBottom: '1px solid #cbd5e1' }}>
+                        <td style={{ padding: '6px 8px' }}>{info.emoji} {t(info.labelKey)}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right' }}>{formatRupiah(amount)}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{calcPercentage(amount, totalExpense)}%</td>
+                      </tr>
+                    )
+                  })
+                )}
+                <tr style={{ borderBottom: '1px solid #000', fontWeight: 700, background: '#f8fafc' }}>
+                  <td style={{ padding: '8px' }}>TOTAL PENGELUARAN</td>
+                  <td style={{ padding: '8px', textAlign: 'right', color: '#ef4444' }}>{formatRupiah(totalExpense)}</td>
+                  <td style={{ padding: '8px', textAlign: 'right' }}>100%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* III. Daftar Transaksi Rinci */}
+          <div style={{ marginBottom: 32 }}>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '0 0 8px 0', textTransform: 'uppercase', borderBottom: '1.5px solid #000', paddingBottom: 4 }}>
+              III. DAFTAR TRANSAKSI RINCI
+            </h4>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #000', background: '#f1f5f9' }}>
+                  <th style={{ textAlign: 'left', padding: '6px 6px', fontWeight: 700, width: '15%' }}>Tanggal</th>
+                  <th style={{ textAlign: 'left', padding: '6px 6px', fontWeight: 700, width: '35%' }}>Nama Barang / Keperluan</th>
+                  <th style={{ textAlign: 'left', padding: '6px 6px', fontWeight: 700, width: '20%' }}>Kategori</th>
+                  <th style={{ textAlign: 'right', padding: '6px 6px', fontWeight: 700, width: '18%' }}>Nominal</th>
+                  <th style={{ textAlign: 'left', padding: '6px 6px', fontWeight: 700, width: '12%' }}>Pencatat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '8px', color: '#64748b' }}>Tidak ada transaksi tercatat.</td>
+                  </tr>
+                ) : (
+                  transactions.map(tx => (
+                    <tr key={tx.id} style={{ borderBottom: '1px solid #cbd5e1' }}>
+                      <td style={{ padding: '6px 6px', fontSize: '0.75rem' }}>{formatDate(tx.transactionDate, language)}</td>
+                      <td style={{ padding: '6px 6px', fontWeight: 500 }}>
+                        {tx.itemName}
+                        {tx.notes && <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', display: 'block' }}>* {tx.notes}</span>}
+                      </td>
+                      <td style={{ padding: '6px 6px' }}>{t(getCategoryInfo(tx.category).labelKey)}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right', fontWeight: 600 }}>{formatRupiah(tx.amount)}</td>
+                      <td style={{ padding: '6px 6px' }}>{tx.member?.name || '-'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Blok Tanda Tangan */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 40, breakInside: 'avoid' }}>
+            <div style={{ textAlign: 'center', width: '40%' }}>
+              <p style={{ margin: '0 0 50px 0', fontSize: '0.85rem' }}>Dilaporkan Oleh,</p>
+              <div style={{ borderBottom: '1px solid #000', width: '80%', margin: '0 auto 4px' }} />
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem' }}>Admin / Pengelola Kas</p>
+            </div>
+            <div style={{ textAlign: 'center', width: '40%' }}>
+              <p style={{ margin: '0 0 50px 0', fontSize: '0.85rem' }}>Disetujui Oleh,</p>
+              <div style={{ borderBottom: '1px solid #000', width: '80%', margin: '0 auto 4px' }} />
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem' }}>Kepala Keluarga</p>
+            </div>
+          </div>
         </div>
 
         <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -504,6 +644,38 @@ export default function LaporanPage() {
               </div>
             </div>
 
+            {/* Grafik Perbandingan Bulanan */}
+            {compareData && (
+              <div className="card" style={{ marginTop: 24 }}>
+                <div className="card-header">
+                  <h3 className="card-title">📊 {t('compare_title')}</h3>
+                </div>
+                <div className="card-body">
+                  <div style={{ height: 260, width: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={[
+                          { name: t('compare_current'), amount: compareData.current.amount, color: 'var(--color-primary-600)' },
+                          { name: t('compare_prev'), amount: compareData.previous.amount, color: '#64748b' },
+                          { name: t('compare_avg'), amount: compareData.avg3Months, color: '#f59e0b' }
+                        ]}
+                        margin={{ top: 20, right: 20, left: 10, bottom: 5 }}
+                      >
+                        <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={12} tickLine={false} />
+                        <YAxis stroke="var(--text-secondary)" fontSize={11} tickLine={false} tickFormatter={v => formatNumber(v)} />
+                        <Tooltip formatter={v => formatRupiah(v)} contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', borderRadius: 8, color: 'var(--text-primary)' }} />
+                        <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                          <Cell fill="var(--color-primary-600)" />
+                          <Cell fill="#64748b" />
+                          <Cell fill="#f59e0b" />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Tabel Transaksi */}
             <div className="card" style={{ marginTop: 24 }}>
               <div className="card-header">
@@ -567,67 +739,29 @@ export default function LaporanPage() {
       {/* Print styles */}
       <style>{`
         @media print {
-          /* Sembunyikan navigasi, sidebar, tombol-tombol, dan panel filter */
-          .sidebar, .bottom-nav, .btn, .mobile-header, .filter-bar, .card-header button, .ai-chat-widget { 
-            display: none !important; 
+          /* Sembunyikan semua elemen di layar */
+          body * {
+            visibility: hidden;
           }
           
-          /* Atur layout halaman cetak */
-          .main-content { 
-            margin-left: 0 !important; 
-            padding: 0 !important;
+          /* Hanya tampilkan tata letak print formal */
+          .print-only-layout, .print-only-layout * {
+            visibility: visible;
+          }
+          
+          .print-only-layout {
+            display: block !important;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
             background: white !important;
             color: black !important;
           }
-          
-          .page-container { 
-            padding: 0 !important; 
-            max-width: 100% !important;
-          }
-          
-          /* Tampilkan Kop Surat Cetak */
-          .print-header-only { 
-            display: block !important; 
-          }
-          
-          /* Hilangkan style card agar menyatu di kertas print */
-          .card { 
-            border: none !important; 
-            box-shadow: none !important; 
-            margin-bottom: 20px !important;
-            background: transparent !important;
-            break-inside: avoid;
-          }
-          
-          .card-body {
-            padding: 0 !important;
-          }
-          
-          /* Atur tabel agar terlihat formal hitam-putih */
-          .table-container {
-            border: 1px solid #000 !important;
-            border-radius: 0 !important;
-          }
-          
-          .table {
-            border-collapse: collapse !important;
-          }
-          
-          .table th {
-            background: #f1f5f9 !important;
-            color: #000 !important;
-            border-bottom: 2px solid #000 !important;
-            font-weight: 700 !important;
-          }
-          
-          .table td {
-            border-bottom: 1px solid #cbd5e1 !important;
-            color: #000 !important;
-          }
-          
-          .table tfoot td {
-            border-top: 2px solid #000 !important;
-            font-weight: 800 !important;
+
+          /* Hilangkan margin default browser print */
+          @page {
+            margin: 1.5cm;
           }
         }
       `}</style>

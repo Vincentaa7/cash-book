@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { logActivity } from '@/lib/logger'
+import { formatRupiah } from '@/lib/format'
 
 export async function GET(request) {
   try {
@@ -108,6 +110,21 @@ export async function POST(request) {
       include: {
         member: { select: { id: true, name: true, avatarColor: true } },
       },
+    })
+
+    // Catat log aktivitas
+    await logActivity({
+      action: 'TRANSACTION_CREATE',
+      description: `${session.name} mencatat transaksi "${itemName}" sebesar ${formatRupiah(amount)}`,
+      details: {
+        id: transaction.id,
+        itemName,
+        amount,
+        category,
+        transactionDate,
+        notes,
+      },
+      memberId: session.id,
     })
 
     return NextResponse.json({

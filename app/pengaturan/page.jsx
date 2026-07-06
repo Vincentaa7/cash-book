@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation'
 import AppShell from '@/components/AppShell'
 import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
-import { formatRupiah, formatNumber } from '@/lib/format'
+import { formatNumber, formatDate, formatTime } from '@/lib/format'
 import { AVATAR_COLORS } from '@/lib/constants'
-import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle, Shield, Database, Trash } from 'lucide-react'
+import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle, Shield, Database, Trash, ClipboardList } from 'lucide-react'
 
 function PengaturanContent() {
   const router = useRouter()
@@ -23,6 +23,13 @@ function PengaturanContent() {
   const [dbPreview, setDbPreview] = useState(null)
   const [dbLoading, setDbLoading] = useState(false)
   const [cleanupDone, setCleanupDone] = useState(null)
+
+  // Activity logs state
+  const [activityLogs, setActivityLogs] = useState([])
+  const [logsTotal, setLogsTotal] = useState(0)
+  const [logsPage, setLogsPage] = useState(1)
+  const [logsTotalPages, setLogsTotalPages] = useState(1)
+  const [logsLoading, setLogsLoading] = useState(false)
 
   // Budget state
   const now = new Date()
@@ -104,6 +111,21 @@ function PengaturanContent() {
       showMessage('error', t('connection_error') || 'Connection error')
     }
     setDbLoading(false)
+  }
+
+  async function fetchActivityLogs(p = 1) {
+    setLogsLoading(true)
+    try {
+      const res = await fetch(`/api/activity-logs?page=${p}&limit=20`)
+      const d = await res.json()
+      setActivityLogs(d.logs || [])
+      setLogsTotal(d.total || 0)
+      setLogsTotalPages(d.totalPages || 1)
+      setLogsPage(d.page || 1)
+    } catch {
+      showMessage('error', t('db_error_load'))
+    }
+    setLogsLoading(false)
   }
 
   function showMessage(type, text) {
@@ -336,6 +358,13 @@ function PengaturanContent() {
                 style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'database' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
               >
                 <Database size={18} /> Database
+              </div>
+              <div 
+                className={`nav-link ${activeTab === 'activityLog' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('activityLog'); fetchActivityLogs(1) }}
+                style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'activityLog' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
+              >
+                <ClipboardList size={18} /> {t('db_log')}
               </div>
             </div>
           </div>
@@ -662,6 +691,110 @@ function PengaturanContent() {
                     <button className="btn btn-secondary" onClick={fetchDbPreview}>
                       <Database size={16} /> {t('db_btn_analyze')}
                     </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'activityLog' && (
+              <div className="card fade-in-up">
+                <div className="card-header">
+                  <h3 className="card-title">📋 {t('db_log')}</h3>
+                </div>
+                <div className="card-body">
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: '0.9rem' }}>
+                    {t('db_log_desc')}
+                  </p>
+
+                  {logsLoading ? (
+                    <div className="loading-container" style={{ padding: 20 }}>
+                      <div className="spinner" />
+                      <p>{t('loading')}</p>
+                    </div>
+                  ) : activityLogs.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
+                      Belum ada aktivitas tercatat.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
+                        <table className="table">
+                          <thead>
+                            <tr>
+                              <th style={{ width: '25%' }}>{t('db_log_actor')}</th>
+                              <th style={{ width: '50%' }}>{t('db_log_action')}</th>
+                              <th style={{ width: '25%' }}>{t('date')}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activityLogs.map(log => (
+                              <tr key={log.id}>
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <div style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: '50%',
+                                      background: log.member?.avatarColor || '#0d9488',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: 'white',
+                                      fontWeight: 600,
+                                      fontSize: '0.75rem',
+                                      flexShrink: 0
+                                    }}>
+                                      {log.member?.name?.substring(0, 2).toUpperCase() || 'S'}
+                                    </div>
+                                    <span style={{ fontWeight: 500, fontSize: '0.85rem' }}>{log.member?.name || 'Sistem'}</span>
+                                  </div>
+                                </td>
+                                <td style={{ fontSize: '0.85rem', lineHeight: 1.4 }}>
+                                  {log.description}
+                                </td>
+                                <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                  {formatDate(log.createdAt, language)} {formatTime(log.createdAt, language)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Pagination for Logs */}
+                      {logsTotalPages > 1 && (
+                        <div className="pagination" style={{ marginTop: 20 }}>
+                          <span className="pagination-info">
+                            Hal {logsPage} / {logsTotalPages} ({logsTotal} log)
+                          </span>
+                          <div className="pagination-controls">
+                            <button
+                              className="pagination-btn"
+                              onClick={() => fetchActivityLogs(logsPage - 1)}
+                              disabled={logsPage === 1}
+                            >
+                              ‹
+                            </button>
+                            {Array.from({ length: logsTotalPages }, (_, idx) => (
+                              <button
+                                key={idx + 1}
+                                className={`pagination-btn ${logsPage === idx + 1 ? 'active' : ''}`}
+                                onClick={() => fetchActivityLogs(idx + 1)}
+                              >
+                                {idx + 1}
+                              </button>
+                            ))}
+                            <button
+                              className="pagination-btn"
+                              onClick={() => fetchActivityLogs(logsPage + 1)}
+                              disabled={logsPage === logsTotalPages}
+                            >
+                              ›
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
