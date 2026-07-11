@@ -93,6 +93,16 @@ export default function CalendarPage() {
     return 'cal-high'
   }
 
+  function formatCompact(val) {
+    if (val >= 1000000) {
+      return (val / 1000000).toFixed(1).replace('.0', '') + 'jt'
+    }
+    if (val >= 1000) {
+      return (val / 1000).toFixed(0) + 'rb'
+    }
+    return val.toString()
+  }
+
   const selectedDayData = selectedDay ? dayStats[selectedDay] : null
 
   // Nama hari
@@ -126,7 +136,7 @@ export default function CalendarPage() {
 
         {/* Legend Penjelasan Warna */}
         <div className="card" style={{ marginBottom: 20, padding: '12px 20px' }}>
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          <div className="calendar-legend">
             <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Info size={14} style={{ color: 'var(--color-primary-500)' }} />
               {t('color_guide')}
@@ -150,7 +160,7 @@ export default function CalendarPage() {
         </div>
 
         {/* Main Grid: Calendar & Day Detail */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, alignItems: 'start' }} className="calendar-layout-grid">
+        <div className="calendar-layout-grid">
           {/* Box Kalender */}
           <div className="card" style={{ padding: 20 }}>
             {loading ? (
@@ -161,7 +171,7 @@ export default function CalendarPage() {
             ) : (
               <div className="calendar-grid-wrapper">
                 {/* Header Hari */}
-                <div className="calendar-days-header" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, marginBottom: 12, textAlign: 'center' }}>
+                <div className="calendar-days-header">
                   {dayLabels.map((lbl, idx) => (
                     <div key={idx} style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', paddingBottom: 6 }}>
                       {lbl}
@@ -170,10 +180,10 @@ export default function CalendarPage() {
                 </div>
 
                 {/* Grid Tanggal */}
-                <div className="calendar-dates-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+                <div className="calendar-dates-grid">
                   {/* Sel Kosong Awal */}
                   {Array(firstDayIndex).fill(null).map((_, idx) => (
-                    <div key={`blank-${idx}`} style={{ minHeight: 76, borderRadius: 12, background: 'transparent' }} />
+                    <div key={`blank-${idx}`} className="calendar-day-cell-blank" />
                   ))}
 
                   {/* Hari di Bulan */}
@@ -188,18 +198,6 @@ export default function CalendarPage() {
                         key={`day-${day}`}
                         onClick={() => setSelectedDay(day)}
                         className={`calendar-day-cell ${intensity} ${isSelected ? 'selected' : ''}`}
-                        style={{
-                          minHeight: 76,
-                          borderRadius: 12,
-                          padding: 8,
-                          position: 'relative',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          transition: 'all 0.2s ease',
-                          border: isSelected ? '2.5px solid var(--color-primary-600)' : '1px solid var(--border-color)'
-                        }}
                       >
                         {/* Angka Tanggal + Indikator Kas Masuk */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -215,18 +213,8 @@ export default function CalendarPage() {
 
                         {/* Pengeluaran Hari Ini */}
                         {stats.expenses > 0 && (
-                          <div
-                            className="cal-day-expense-label"
-                            style={{
-                              fontSize: '0.7rem',
-                              fontWeight: 700,
-                              textAlign: 'right',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}
-                          >
-                            {formatRupiah(stats.expenses).replace(',00', '').replace('Rp ', '')}
+                          <div className="cal-day-expense-label">
+                            {formatCompact(stats.expenses)}
                           </div>
                         )}
                       </div>
@@ -334,11 +322,55 @@ export default function CalendarPage() {
           display: grid;
           grid-template-columns: 2fr 1fr;
           gap: 24px;
+          align-items: start;
+        }
+
+        .calendar-legend {
+          display: flex;
+          gap: 16px;
+          flex-wrap: wrap;
+          align-items: center;
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+        }
+
+        .calendar-days-header {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 8px;
+          margin-bottom: 12px;
+          text-align: center;
+        }
+
+        .calendar-dates-grid {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 8px;
         }
 
         .calendar-day-cell {
-          background: var(--bg-tertiary);
+          min-height: 76px;
+          border-radius: 12px;
+          padding: 8px;
+          position: relative;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          justifyContent: space-between;
+          transition: all 0.2s ease;
           border: 1px solid var(--border-color);
+          background: var(--bg-tertiary);
+        }
+
+        .calendar-day-cell-blank {
+          min-height: 76px;
+          background: transparent;
+        }
+
+        .calendar-day-cell.selected {
+          border: 2.5px solid var(--color-primary-600) !important;
+          transform: scale(1.02);
+          box-shadow: 0 4px 14px rgba(13, 148, 136, 0.25);
         }
 
         /* Intensitas warna hemat (hijau) */
@@ -377,16 +409,17 @@ export default function CalendarPage() {
           border-color: var(--color-primary-400) !important;
         }
 
-        .calendar-day-cell.selected {
-          transform: scale(1.02);
-          box-shadow: 0 4px 14px rgba(13, 148, 136, 0.25);
-        }
-
         .cal-day-expense-label {
           background: rgba(0, 0, 0, 0.06);
           padding: 2px 4px;
           border-radius: 4px;
           color: inherit;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-align: right;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         [data-theme="dark"] .cal-day-expense-label {
           background: rgba(255, 255, 255, 0.08);
@@ -395,9 +428,32 @@ export default function CalendarPage() {
         @media (max-width: 900px) {
           .calendar-layout-grid {
             grid-template-columns: 1fr;
+            gap: 16px;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .calendar-legend {
+            gap: 8px;
+            font-size: 0.7rem;
+          }
+          .calendar-days-header {
+            gap: 4px;
+          }
+          .calendar-dates-grid {
+            gap: 4px;
           }
           .calendar-day-cell {
-            min-height: 64px !important;
+            min-height: 52px;
+            padding: 4px;
+            border-radius: 8px;
+          }
+          .calendar-day-cell-blank {
+            min-height: 52px;
+          }
+          .cal-day-expense-label {
+            font-size: 0.6rem;
+            padding: 1px 2px;
           }
         }
       `}</style>
