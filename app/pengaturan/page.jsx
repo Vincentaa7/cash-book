@@ -9,6 +9,7 @@ import { useLanguage } from '@/components/LanguageContext'
 import { formatNumber, formatDate, formatTime } from '@/lib/format'
 import { AVATAR_COLORS } from '@/lib/constants'
 import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle, Shield, Database, Trash, ClipboardList } from 'lucide-react'
+import DailyReminderSetup from '@/components/DailyReminderSetup'
 
 function PengaturanContent() {
   const router = useRouter()
@@ -564,6 +565,19 @@ function PengaturanContent() {
                       {loading ? t('loading') : t('save')}
                     </button>
                   </form>
+
+                  <hr style={{ margin: '28px 0', borderColor: 'var(--border-color)', opacity: 0.5 }} />
+
+                  {/* Pengingat Harian */}
+                  <div>
+                    <h4 style={{ fontWeight: 700, marginBottom: 4, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      🔔 {t('reminder_title')}
+                    </h4>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16, marginTop: 4 }}>
+                      {t('reminder_subtitle')}
+                    </p>
+                    <DailyReminderSetup familyName={familyName || 'Cash Book'} />
+                  </div>
                 </div>
               </div>
             )}
