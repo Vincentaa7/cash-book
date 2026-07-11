@@ -39,15 +39,7 @@ export default function TransaksiPage() {
   const [deleteTx, setDeleteTx] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  // User role
-  const [userRole, setUserRole] = useState('member')
-  const [userId, setUserId] = useState(null)
-
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => {
-      setUserRole(d.user?.role)
-      setUserId(d.user?.id)
-    })
     fetch('/api/members').then(r => r.json()).then(d => setMembers(d.members || []))
   }, [])
 
@@ -309,8 +301,8 @@ export default function TransaksiPage() {
                 </thead>
                 <tbody>
                   {transactions.map(tx => {
-                    const isOwner = tx.memberId === userId
-                    const isAdmin = userRole === 'admin'
+                    const isOwner = tx.memberId === user?.id
+                    const isAdmin = user?.role === 'admin'
                     const within24h = (Date.now() - new Date(tx.createdAt).getTime()) < 86400000
                     const canEdit = isAdmin || (isOwner && within24h)
                     const canDelete = isAdmin

@@ -56,7 +56,7 @@ export default function LaporanPage() {
 
   async function fetchSummaryForMonth(m, y) {
     try {
-      const res = await fetch(`/api/dashboard?month=${m}&year=${y}`)
+      const res = await fetch(`/api/dashboard?month=${m}&year=${y}&summaryOnly=true`)
       const d = await res.json()
       setDashboardSummary(d.summary)
     } catch {}

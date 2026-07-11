@@ -15,10 +15,40 @@ export async function GET(request) {
     const now = new Date()
     const month = parseInt(searchParams.get('month')) || now.getMonth() + 1
     const year = parseInt(searchParams.get('year')) || now.getFullYear()
+    const summaryOnly = searchParams.get('summaryOnly') === 'true'
 
     // Tanggal awal dan akhir bulan
     const firstDay = new Date(year, month - 1, 1)
     const lastDay = new Date(year, month, 0)
+
+    if (summaryOnly) {
+      const [budget, transactions] = await Promise.all([
+        // Kas bulan ini
+        prisma.monthlyBudget.findUnique({
+          where: { uq_month_year: { month, year } },
+        }),
+        // Jumlah transaksi bulan ini
+        prisma.transaction.aggregate({
+          where: {
+            transactionDate: { gte: firstDay, lte: lastDay },
+          },
+          _sum: { amount: true },
+        }),
+      ])
+
+      const totalBudget = budget ? Number(budget.amount) : 0
+      const totalExpense = Number(transactions._sum.amount || 0)
+      const remaining = totalBudget - totalExpense
+
+      return NextResponse.json({
+        summary: {
+          totalBudget,
+          totalExpense,
+          remaining,
+          budgetPercentUsed: totalBudget > 0 ? Math.round((totalExpense / totalBudget) * 100) : 0,
+        },
+      })
+    }
 
     // Jalankan semua query secara paralel
     const [budget, transactions, recentTransactions, settings] = await Promise.all([
