@@ -56,7 +56,7 @@ function PengaturanContent() {
   }, [user, router])
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' || user?.role === 'superadmin') {
       fetchData()
     }
   }, [user, currentMonth, currentYear])
@@ -306,7 +306,7 @@ function PengaturanContent() {
     setLoading(false)
   }
 
-  if (!user || user.role !== 'admin') return null
+  if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) return null
 
   return (
     <>
