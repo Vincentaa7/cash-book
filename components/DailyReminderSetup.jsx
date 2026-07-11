@@ -166,15 +166,18 @@ export default function DailyReminderSetup({ familyName = 'Cash Book' }) {
         padding: '16px 20px',
         borderRadius: 12,
         border: `2px solid ${enabled ? 'var(--color-primary-600)' : 'var(--border-color)'}`,
-        background: enabled ? 'var(--color-primary-50, rgba(13,148,136,0.06))' : 'var(--bg-secondary)',
+        background: enabled
+          ? 'var(--color-primary-hover, rgba(13,148,136,0.08))'
+          : 'var(--bg-secondary)',
         transition: 'all 0.2s ease',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{
             width: 44, height: 44, borderRadius: '50%',
-            background: enabled ? 'var(--color-primary-600)' : 'var(--border-color)',
+            background: enabled ? 'var(--color-primary-600)' : 'var(--bg-tertiary)',
+            border: enabled ? 'none' : '1px solid var(--border-color)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'white', transition: 'background 0.2s',
+            color: enabled ? 'white' : 'var(--text-muted)', transition: 'all 0.2s',
           }}>
             {enabled ? <Bell size={20} /> : <BellOff size={20} />}
           </div>
@@ -193,19 +196,20 @@ export default function DailyReminderSetup({ familyName = 'Cash Book' }) {
             position: 'relative',
             width: 52, height: 28,
             borderRadius: 14,
-            background: enabled ? 'var(--color-primary-600)' : 'var(--border-color)',
-            border: 'none', cursor: 'pointer',
-            transition: 'background 0.2s',
+            background: enabled ? 'var(--color-primary-600)' : 'var(--bg-tertiary)',
+            border: `1px solid ${enabled ? 'var(--color-primary-600)' : 'var(--border-color)'}`,
+            cursor: 'pointer',
+            transition: 'all 0.2s',
             flexShrink: 0,
           }}
         >
           <span style={{
             position: 'absolute',
-            top: 3, left: enabled ? 27 : 3,
+            top: 3, left: enabled ? 26 : 3,
             width: 22, height: 22,
             borderRadius: '50%', background: 'white',
             transition: 'left 0.2s ease',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
           }} />
         </button>
       </div>

@@ -489,7 +489,9 @@ function PengaturanContent() {
                             </div>
                           </td>
                           <td className="hide-on-mobile">
-                             {m.role === 'admin' ? 
+                             {m.role === 'superadmin' ?
+                              <span className="badge" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', color: 'white', display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content' }}><Shield size={12}/> Super Admin</span> :
+                              m.role === 'admin' ? 
                               <span className="badge badge-purple"><Shield size={12}/> Admin</span> : 
                               <span className="badge badge-blue">{t('member_role')}</span>
                              }
@@ -499,16 +501,26 @@ function PengaturanContent() {
                           </td>
                           <td>
                             <div style={{ display: 'flex', gap: 6 }}>
-                              <button className="btn-icon" onClick={() => openEditMember(m)} title="Edit"><Edit2 size={16}/></button>
-                              <button 
-                                className="btn-icon" 
-                                onClick={() => handleToggleMemberActive(m.id, m.isActive)}
-                                disabled={m.id === user.id}
-                                title={m.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-                                style={{ color: m.isActive ? 'var(--color-danger)' : 'var(--color-success)' }}
-                              >
-                                {m.isActive ? <Trash2 size={16}/> : <Check size={16}/>}
-                              </button>
+                              {m.role !== 'superadmin' && (
+                                <button className="btn-icon" onClick={() => openEditMember(m)} title="Edit"><Edit2 size={16}/></button>
+                              )}
+                              {m.role !== 'superadmin' && (
+                                <button 
+                                  className="btn-icon" 
+                                  onClick={() => handleToggleMemberActive(m.id, m.isActive)}
+                                  disabled={m.id === user.id}
+                                  title={m.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                                  style={{ color: m.isActive ? 'var(--color-danger)' : 'var(--color-success)' }}
+                                >
+                                  {m.isActive ? <Trash2 size={16}/> : <Check size={16}/>}
+                                </button>
+                              )}
+                              {m.role === 'superadmin' && m.id === user.id && (
+                                <button className="btn-icon" onClick={() => openEditMember(m)} title="Edit profil sendiri"><Edit2 size={16}/></button>
+                              )}
+                              {m.role === 'superadmin' && m.id !== user.id && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '0 4px' }}>🔒 Terlindungi</span>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -861,8 +873,11 @@ function PengaturanContent() {
                       className="form-select"
                       value={memberForm.role}
                       onChange={e => setMemberForm(f => ({ ...f, role: e.target.value }))}
-                      disabled={editMember?.id === user.id} // Tidak bisa edit role sendiri
+                      disabled={editMember?.id === user.id || editMember?.role === 'superadmin'}
                     >
+                      {user?.role === 'superadmin' && (
+                        <option value="superadmin">Super Admin</option>
+                      )}
                       <option value="admin">Admin ({t('system_menu')})</option>
                       <option value="member">{t('member_role')} ({t('history')})</option>
                     </select>

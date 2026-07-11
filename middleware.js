@@ -47,7 +47,7 @@ export async function middleware(request) {
 
   // Cek akses admin
   const isAdminRoute = ADMIN_ROUTES.some(route => pathname.startsWith(route))
-  if (isAdminRoute && payload.role !== 'admin') {
+  if (isAdminRoute && payload.role !== 'admin' && payload.role !== 'superadmin') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
