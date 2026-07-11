@@ -5,13 +5,13 @@ import { useState, useEffect, useCallback } from 'react'
 import AppShell from '@/components/AppShell'
 import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
-import { formatRupiah, formatDate, formatMonthYear, formatNumber, getMonthName, getBudgetStatusColor, MONTH_NAMES } from '@/lib/format'
+import { formatRupiah, formatDate, formatMonthYear, getMonthName, getBudgetStatusColor, MONTH_NAMES } from '@/lib/format'
 import { getCategoryInfo } from '@/lib/constants'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid
 } from 'recharts'
-import { TrendingUp, ArrowRight, AlertTriangle, Info, Scale } from 'lucide-react'
+import { TrendingUp, ArrowRight, AlertTriangle, Info } from 'lucide-react'
 import Link from 'next/link'
 
 export default function DashboardPage() {
@@ -21,11 +21,6 @@ export default function DashboardPage() {
   const [year, setYear] = useState(now.getFullYear())
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-
-  // State Rekonsiliasi Saldo
-  const [reconWallet, setReconWallet] = useState('')
-  const [reconResult, setReconResult] = useState(null) // null | { gap: number, ok: boolean }
-  const [reconPosting, setReconPosting] = useState(false)
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true)
@@ -42,51 +37,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboard()
-    // Reset rekonsiliasi saat bulan/tahun berubah
-    setReconWallet('')
-    setReconResult(null)
   }, [fetchDashboard])
-
-  // Hanya aktifkan rekonsiliasi untuk bulan berjalan
-  const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear()
-
-  function handleReconCheck() {
-    const walletAmount = parseInt(reconWallet.replace(/[^0-9]/g, ''), 10)
-    if (isNaN(walletAmount) || walletAmount < 0) return
-    const recordedBalance = data?.summary?.remaining ?? 0
-    const gap = recordedBalance - walletAmount
-    setReconResult({ gap, ok: Math.abs(gap) < 1000 }) // toleransi Rp 1000
-  }
-
-  async function handleReconPost() {
-    if (!reconResult || reconResult.ok) return
-    const gap = Math.abs(reconResult.gap)
-    if (gap <= 0) return
-
-    setReconPosting(true)
-    try {
-      const today = new Date()
-      const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-      await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itemName: 'Pengeluaran Tidak Tercatat (Rekonsiliasi)',
-          amount: gap,
-          category: 'lainnya',
-          transactionDate: dateStr,
-          notes: `Selisih rekonsiliasi saldo: ${formatRupiah(gap)}`,
-        }),
-      })
-      setReconResult(null)
-      setReconWallet('')
-      fetchDashboard() // Refresh dashboard
-    } catch (e) {
-      console.error('Recon post error:', e)
-    } finally {
-      setReconPosting(false)
-    }
-  }
 
   const statusColor = data?.summary ? getBudgetStatusColor(data.summary.remaining, data.summary.totalBudget) : 'success'
   const pct = data?.summary ? data.summary.budgetPercentUsed : 0
@@ -194,34 +145,34 @@ export default function DashboardPage() {
 
             {/* Summary Cards */}
             <div className="summary-grid fade-in-up">
-              <div className="summary-card teal">
-                <div className="summary-card-icon" style={{ background: '#ccfbf1' }}>💵</div>
+              <div className="summary-card card-budget">
+                <div className="summary-card-icon">💵</div>
                 <div className="summary-card-label">{t('total_budget')}</div>
                 <div className="summary-card-value">{formatRupiah(data?.summary?.totalBudget || 0)}</div>
                 <div className="summary-card-sub">{formatMonthYear(month, year, language)}</div>
               </div>
 
-              <div className="summary-card red">
-                <div className="summary-card-icon" style={{ background: '#fee2e2' }}>💸</div>
+              <div className="summary-card card-expense">
+                <div className="summary-card-icon">💸</div>
                 <div className="summary-card-label">{t('total_expense')}</div>
                 <div className="summary-card-value">{formatRupiah(data?.summary?.totalExpense || 0)}</div>
                 <div className="summary-card-sub">{data?.summary?.budgetPercentUsed || 0}% {t('expense_ratio')}</div>
                 {data?.summary?.totalBudget > 0 && (
                   <div className="progress-bar">
                     <div
-                      className={`progress-fill ${statusColor}`}
+                      className="progress-fill"
                       style={{ width: `${Math.min(100, pct)}%` }}
                     />
                   </div>
                 )}
               </div>
 
-              <div className={`summary-card ${statusColor === 'success' ? 'green' : statusColor === 'warning' ? 'yellow' : 'red'}`}>
-                <div className="summary-card-icon" style={{ background: statusColor === 'success' ? '#dcfce7' : statusColor === 'warning' ? '#fef9c3' : '#fee2e2' }}>
+              <div className="summary-card card-balance">
+                <div className="summary-card-icon">
                   {statusColor === 'success' ? '💚' : statusColor === 'warning' ? '⚠️' : '🔴'}
                 </div>
                 <div className="summary-card-label">{t('balance')}</div>
-                <div className={`summary-card-value ${statusColor}`}>
+                <div className="summary-card-value">
                   {formatRupiah(data?.summary?.remaining || 0)}
                 </div>
                 <div className="summary-card-sub">
@@ -231,91 +182,13 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="summary-card yellow">
-                <div className="summary-card-icon" style={{ background: '#fef9c3' }}>📈</div>
+              <div className="summary-card card-avg-day">
+                <div className="summary-card-icon">📈</div>
                 <div className="summary-card-label">{t('daily_avg')}</div>
                 <div className="summary-card-value">{formatRupiah(data?.summary?.avgPerDay || 0)}</div>
                 <div className="summary-card-sub">{t('digital_cashbook')}</div>
               </div>
             </div>
-
-            {/* Card Rekonsiliasi Saldo — hanya untuk bulan berjalan */}
-            {isCurrentMonth && data?.summary?.totalBudget > 0 && (
-              <div className="card fade-in-up" style={{ marginBottom: 24, border: '2px solid var(--border-color)' }}>
-                <div className="card-header" style={{ gap: 10 }}>
-                  <Scale size={20} style={{ color: 'var(--color-primary-600)' }} />
-                  <h3 className="card-title">{t('recon_title')}</h3>
-                </div>
-                <div className="card-body">
-                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 20 }}>
-                    {t('recon_subtitle')}
-                  </p>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-                    <div style={{ background: 'var(--bg-tertiary)', borderRadius: 12, padding: '14px 18px' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4 }}>{t('recon_recorded')}</div>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 700, color: data?.summary?.remaining >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                        {formatRupiah(data?.summary?.remaining ?? 0)}
-                      </div>
-                    </div>
-                    <div style={{ background: 'var(--bg-tertiary)', borderRadius: 12, padding: '14px 18px' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 6 }}>{t('recon_wallet')}</div>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Rp 0"
-                        value={reconWallet}
-                        onChange={e => {
-                          const raw = e.target.value.replace(/[^0-9]/g, '')
-                          setReconWallet(raw ? formatNumber(parseInt(raw, 10)) : '')
-                          setReconResult(null)
-                        }}
-                        style={{ padding: '6px 10px', fontSize: '1rem', fontWeight: 600 }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Hasil rekonsiliasi */}
-                  {reconResult && (
-                    <div className={`alert ${reconResult.ok ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 16, flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
-                      {reconResult.ok ? (
-                        <span>{t('recon_ok')}</span>
-                      ) : (
-                        <>
-                          <div style={{ fontWeight: 700 }}>⚠️ {t('recon_gap')}: {formatRupiah(Math.abs(reconResult.gap))}</div>
-                          <div style={{ fontSize: '0.85rem', opacity: 0.85 }}>{t('recon_gap_desc')}</div>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            style={{ marginTop: 4 }}
-                            onClick={handleReconPost}
-                            disabled={reconPosting}
-                          >
-                            {reconPosting ? t('loading') : t('recon_record_diff')}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button
-                      className="btn btn-primary"
-                      onClick={handleReconCheck}
-                      disabled={!reconWallet}
-                    >
-                      <Scale size={15} /> {t('recon_check')}
-                    </button>
-                    {reconResult && (
-                      <button className="btn btn-ghost" onClick={() => { setReconResult(null); setReconWallet('') }}>
-                        {t('recon_reset')}
-                      </button>
-                    )}
-                  </div>
-
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 12 }}>{t('recon_note')}</p>
-                </div>
-              </div>
-            )}
 
             {/* Charts */}
             <div className="charts-grid">
@@ -451,7 +324,7 @@ export default function DashboardPage() {
                             </div>
                           </td>
                           <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
-                          <td style={{ fontWeight: 600, color: '#ef4444' }}>{formatRupiah(t.amount)}</td>
+                          <td style={{ fontWeight: 600, color: t.category === 'pemasukan' ? 'var(--color-success)' : '#ef4444' }}>{formatRupiah(t.amount)}</td>
                           <td className="hide-on-mobile" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{formatDate(t.transactionDate, language)}</td>
                           <td className="hide-on-mobile">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

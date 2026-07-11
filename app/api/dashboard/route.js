@@ -31,6 +31,7 @@ export async function GET(request) {
         prisma.transaction.aggregate({
           where: {
             transactionDate: { gte: firstDay, lte: lastDay },
+            category: { not: 'pemasukan' },
           },
           _sum: { amount: true },
         }),
@@ -78,7 +79,7 @@ export async function GET(request) {
     ])
 
     // Hitung total pengeluaran bulan ini
-    const totalExpense = transactions.reduce((sum, t) => sum + Number(t.amount), 0)
+    const totalExpense = transactions.filter(t => t.category !== 'pemasukan').reduce((sum, t) => sum + Number(t.amount), 0)
     const totalBudget = budget ? Number(budget.amount) : 0
     const remaining = totalBudget - totalExpense
 
@@ -97,8 +98,10 @@ export async function GET(request) {
       expenseByDay[d] = 0
     }
     transactions.forEach(t => {
-      const day = new Date(t.transactionDate).getDate()
-      expenseByDay[day] = (expenseByDay[day] || 0) + Number(t.amount)
+      if (t.category !== 'pemasukan') {
+        const day = new Date(t.transactionDate).getDate()
+        expenseByDay[day] = (expenseByDay[day] || 0) + Number(t.amount)
+      }
     })
 
     const dailyExpenses = Object.entries(expenseByDay).map(([day, amount]) => ({
@@ -109,8 +112,10 @@ export async function GET(request) {
     // Pengeluaran per kategori (untuk pie/donut chart)
     const categoryMap = {}
     transactions.forEach(t => {
-      const cat = t.category
-      categoryMap[cat] = (categoryMap[cat] || 0) + Number(t.amount)
+      if (t.category !== 'pemasukan') {
+        const cat = t.category
+        categoryMap[cat] = (categoryMap[cat] || 0) + Number(t.amount)
+      }
     })
     const expenseByCategory = Object.entries(categoryMap)
       .map(([category, amount]) => ({ category, amount }))
@@ -141,7 +146,7 @@ export async function GET(request) {
         if (mLastDay < cutoffDate) {
           // Ambil dari monthly_snapshots
           const snapshotAgg = await prisma.monthlySnapshot.aggregate({
-            where: { month: m, year: y },
+            where: { month: m, year: y, category: { not: 'pemasukan' } },
             _sum: { totalAmount: true },
           })
           expenseAmount = Number(snapshotAgg._sum.totalAmount || 0)
@@ -149,7 +154,10 @@ export async function GET(request) {
           // Jika snapshot kosong, coba fallback ke transactions (mungkin belum dicleanup)
           if (expenseAmount === 0) {
             const txAgg = await prisma.transaction.aggregate({
-              where: { transactionDate: { gte: mFirstDay, lte: mLastDay } },
+              where: {
+                transactionDate: { gte: mFirstDay, lte: mLastDay },
+                category: { not: 'pemasukan' }
+              },
               _sum: { amount: true },
             })
             expenseAmount = Number(txAgg._sum.amount || 0)
@@ -157,7 +165,10 @@ export async function GET(request) {
         } else {
           // Bulan masih dalam range 90 hari, ambil dari transactions
           const mExpense = await prisma.transaction.aggregate({
-            where: { transactionDate: { gte: mFirstDay, lte: mLastDay } },
+            where: {
+              transactionDate: { gte: mFirstDay, lte: mLastDay },
+              category: { not: 'pemasukan' }
+            },
             _sum: { amount: true },
           })
           expenseAmount = Number(mExpense._sum.amount || 0)

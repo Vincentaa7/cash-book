@@ -21,7 +21,7 @@ export async function PUT(request, { params }) {
     }
 
     // Cek akses: admin bisa edit semua, member hanya edit miliknya dalam 24 jam
-    const isAdmin = session.role === 'admin'
+    const isAdmin = session.role === 'admin' || session.role === 'superadmin'
     const isOwner = transaction.memberId === session.id
     const isWithin24h = (Date.now() - new Date(transaction.createdAt).getTime()) < 24 * 60 * 60 * 1000
 
@@ -86,7 +86,7 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const session = await getSession()
-    if (!session || session.role !== 'admin') {
+    if (!session || (session.role !== 'admin' && session.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Hanya admin yang bisa menghapus transaksi' }, { status: 403 })
     }
 

@@ -195,9 +195,45 @@ export default function NewTransactionPage() {
                       placeholder="0"
                       value={form.amount ? formatNumber(parseInt(form.amount)) : ''}
                       onChange={handleAmountChange}
-                      style={{ paddingLeft: 40 }}
+                      style={{ paddingLeft: 40, fontSize: '1.1rem', fontWeight: 600 }}
                     />
                   </div>
+                  
+                  {/* Pintasan Tambah Nominal Cepat */}
+                  <div className="quick-amount-row">
+                    {[
+                      { val: 10000, label: '+10rb' },
+                      { val: 20000, label: '+20rb' },
+                      { val: 50000, label: '+50rb' },
+                      { val: 100000, label: '+100rb' },
+                      { val: 250000, label: '+250rb' },
+                      { val: 500000, label: '+500rb' },
+                    ].map(btn => (
+                      <button
+                        key={btn.label}
+                        type="button"
+                        className="quick-amount-btn"
+                        onClick={() => {
+                          const currentVal = parseInt(form.amount || '0', 10)
+                          const nextVal = currentVal + btn.val
+                          setForm(prev => ({ ...prev, amount: String(nextVal) }))
+                          if (errors.amount) setErrors(prev => ({ ...prev, amount: '' }))
+                        }}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                    {form.amount && (
+                      <button
+                        type="button"
+                        className="quick-amount-btn reset-btn"
+                        onClick={() => setForm(prev => ({ ...prev, amount: '' }))}
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+
                   {errors.amount && <div className="form-error">{errors.amount}</div>}
                   {willExceed && (
                     <div className="form-error" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -207,27 +243,31 @@ export default function NewTransactionPage() {
                   )}
                 </div>
 
-                {/* Kategori */}
+                {/* Kategori - Visual Grid Selection */}
                 <div className="form-group">
-                  <label className="form-label" htmlFor="tx-category">
+                  <label className="form-label" style={{ marginBottom: 10 }}>
                     {t('category')} <span className="required">*</span>
                   </label>
-                  <select
-                    id="tx-category"
-                    className={`form-select ${errors.category ? 'error' : ''}`}
-                    value={form.category}
-                    onChange={e => {
-                      setForm(prev => ({ ...prev, category: e.target.value }))
-                      if (errors.category) setErrors(prev => ({ ...prev, category: '' }))
-                    }}
-                  >
-                    <option value="">-- {t('all_categories')} --</option>
-                    {CATEGORIES.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.emoji} {t(c.labelKey)}
-                      </option>
-                    ))}
-                  </select>
+                  
+                  <div className="category-grid">
+                    {CATEGORIES.map(c => {
+                      const isActive = form.category === c.id
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={`category-grid-item ${isActive ? 'active' : ''}`}
+                          onClick={() => {
+                            setForm(prev => ({ ...prev, category: c.id }))
+                            if (errors.category) setErrors(prev => ({ ...prev, category: '' }))
+                          }}
+                        >
+                          <span className="category-grid-item-emoji">{c.emoji}</span>
+                          <span className="category-grid-item-label">{t(c.labelKey)}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                   {errors.category && <div className="form-error">{errors.category}</div>}
                 </div>
 

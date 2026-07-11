@@ -48,7 +48,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const session = await getSession()
-    if (!session || session.role !== 'admin') {
+    if (!session || (session.role !== 'admin' && session.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Hanya admin yang bisa mengatur kas bulanan' }, { status: 403 })
     }
 
@@ -78,6 +78,23 @@ export async function POST(request) {
           amount: { increment: parsedAmount },
           createdBy: session.id,
         },
+      })
+
+      // Tambah transaksi kas masuk ke riwayat
+      let txDate = new Date()
+      if (txDate.getMonth() + 1 !== parsedMonth || txDate.getFullYear() !== parsedYear) {
+        txDate = new Date(parsedYear, parsedMonth - 1, 1)
+      }
+
+      await prisma.transaction.create({
+        data: {
+          itemName: 'Tambah Kas (Top-up)',
+          amount: parsedAmount,
+          category: 'pemasukan',
+          transactionDate: txDate,
+          notes: `Penambahan saldo kas oleh ${session.name}`,
+          memberId: session.id,
+        }
       })
 
       // Catat log aktivitas tambah kas

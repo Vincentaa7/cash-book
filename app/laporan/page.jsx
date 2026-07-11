@@ -151,10 +151,11 @@ export default function LaporanPage() {
   }
 
   const transactions = data?.transactions || []
-  const totalExpense = transactions.reduce((s, t) => s + t.amount, 0)
+  const expenseTransactions = transactions.filter(t => t.category !== 'pemasukan')
+  const totalExpense = expenseTransactions.reduce((s, t) => s + Number(t.amount), 0)
 
   // 1. Rata-rata per transaksi [NEW]
-  const avgTxAmount = transactions.length > 0 ? Math.round(totalExpense / transactions.length) : 0
+  const avgTxAmount = expenseTransactions.length > 0 ? Math.round(totalExpense / expenseTransactions.length) : 0
 
   // 2. Hari Terboros (Peak Day) [NEW]
   const dayNamesID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
@@ -162,7 +163,7 @@ export default function LaporanPage() {
   const dayNamesNL = ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag']
 
   const dayExpenses = Array(7).fill(0)
-  transactions.forEach(t => {
+  expenseTransactions.forEach(t => {
     const d = new Date(t.transactionDate)
     const dayIndex = d.getDay()
     dayExpenses[dayIndex] += Number(t.amount)
@@ -188,8 +189,8 @@ export default function LaporanPage() {
 
   // Kategori breakdown
   const catMap = {}
-  transactions.forEach(t => {
-    catMap[t.category] = (catMap[t.category] || 0) + t.amount
+  expenseTransactions.forEach(t => {
+    catMap[t.category] = (catMap[t.category] || 0) + Number(t.amount)
   })
   const catBreakdown = Object.entries(catMap)
     .map(([cat, amt]) => ({ category: cat, amount: amt }))
@@ -197,9 +198,9 @@ export default function LaporanPage() {
 
   // Per anggota
   const memberMap = {}
-  transactions.forEach(t => {
+  expenseTransactions.forEach(t => {
     const n = t.member?.name || 'Tidak diketahui'
-    memberMap[n] = (memberMap[n] || 0) + t.amount
+    memberMap[n] = (memberMap[n] || 0) + Number(t.amount)
   })
   const memberBreakdown = Object.entries(memberMap)
     .map(([name, amt]) => ({ name, amount: amt }))
@@ -336,7 +337,7 @@ export default function LaporanPage() {
                         {tx.notes && <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', display: 'block' }}>* {tx.notes}</span>}
                       </td>
                       <td style={{ padding: '6px 6px' }}>{t(getCategoryInfo(tx.category).labelKey)}</td>
-                      <td style={{ padding: '6px 6px', textAlign: 'right', fontWeight: 600 }}>{formatRupiah(tx.amount)}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right', fontWeight: 600, color: tx.category === 'pemasukan' ? '#10b981' : '#ef4444' }}>{formatRupiah(tx.amount)}</td>
                       <td style={{ padding: '6px 6px' }}>{tx.member?.name || '-'}</td>
                     </tr>
                   ))
@@ -495,32 +496,32 @@ export default function LaporanPage() {
             {/* Summary */}
             <div className="summary-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
               {/* Card 1: Total Transaksi */}
-              <div className="summary-card teal">
-                <div className="summary-card-icon" style={{ background: '#ccfbf1' }}>📊</div>
+              <div className="summary-card card-history">
+                <div className="summary-card-icon">📊</div>
                 <div className="summary-card-label">{t('history')}</div>
                 <div className="summary-card-value">{transactions.length}</div>
                 <div className="summary-card-sub">{startDate} s/d {endDate}</div>
               </div>
 
               {/* Card 2: Total Pengeluaran */}
-              <div className="summary-card red">
-                <div className="summary-card-icon" style={{ background: '#fee2e2' }}>💸</div>
+              <div className="summary-card card-expense">
+                <div className="summary-card-icon">💸</div>
                 <div className="summary-card-label">{t('total_expense')}</div>
                 <div className="summary-card-value">{formatRupiah(totalExpense)}</div>
                 <div className="summary-card-sub">{t('digital_cashbook')}</div>
               </div>
 
               {/* Card 3: Rata-rata per Transaksi */}
-              <div className="summary-card yellow">
-                <div className="summary-card-icon" style={{ background: '#fef9c3' }}>🧮</div>
+              <div className="summary-card card-avg-tx">
+                <div className="summary-card-icon">🧮</div>
                 <div className="summary-card-label">{t('avg_transaction')}</div>
                 <div className="summary-card-value">{formatRupiah(avgTxAmount)}</div>
                 <div className="summary-card-sub">Per transaksi dicatat</div>
               </div>
 
               {/* Card 4: Hari Terboros */}
-              <div className="summary-card orange">
-                <div className="summary-card-icon" style={{ background: '#ffedd5' }}>📅</div>
+              <div className="summary-card card-peak-day">
+                <div className="summary-card-icon">📅</div>
                 <div className="summary-card-label">{t('most_expensive_day')}</div>
                 <div className="summary-card-value" style={{ fontSize: '1.45rem' }}>{peakDayName}</div>
                 <div className="summary-card-sub">{maxDayExpense > 0 ? `Total: ${formatRupiah(maxDayExpense)}` : 'Belum ada data'}</div>
@@ -528,8 +529,8 @@ export default function LaporanPage() {
 
               {/* Card 5: Kategori Terboros */}
               {catBreakdown[0] ? (
-                <div className="summary-card yellow" style={{ borderTop: '3px solid var(--color-warning)' }}>
-                  <div className="summary-card-icon" style={{ background: '#fef9c3' }}>🏆</div>
+                <div className="summary-card card-peak-cat">
+                  <div className="summary-card-icon">🏆</div>
                   <div className="summary-card-label">{t('highest_expense')} ({t('category').split(' ')[0]})</div>
                   <div className="summary-card-value" style={{ fontSize: '1.15rem' }}>
                     {getCategoryInfo(catBreakdown[0].category).emoji} {t(getCategoryInfo(catBreakdown[0].category).labelKey)}
@@ -537,8 +538,8 @@ export default function LaporanPage() {
                   <div className="summary-card-sub">{formatRupiah(catBreakdown[0].amount)}</div>
                 </div>
               ) : (
-                <div className="summary-card yellow">
-                  <div className="summary-card-icon" style={{ background: '#fef9c3' }}>🏆</div>
+                <div className="summary-card card-peak-cat">
+                  <div className="summary-card-icon">🏆</div>
                   <div className="summary-card-label">{t('highest_expense')}</div>
                   <div className="summary-card-value">-</div>
                   <div className="summary-card-sub">Belum ada data</div>
@@ -547,15 +548,15 @@ export default function LaporanPage() {
 
               {/* Card 6: Anggota Terboros */}
               {memberBreakdown[0] ? (
-                <div className="summary-card" style={{ borderTop: '3px solid #8b5cf6' }}>
-                  <div className="summary-card-icon" style={{ background: '#ede9fe' }}>👤</div>
+                <div className="summary-card card-peak-member">
+                  <div className="summary-card-icon">👤</div>
                   <div className="summary-card-label">{t('highest_expense')} ({t('member_name').split(' ')[0]})</div>
-                  <div className="summary-card-value" style={{ fontSize: '1.3rem' }}>{memberBreakdown[0].name}</div>
+                  <div className="summary-card-value" style={{ fontSize: '1.3rem' }} title={memberBreakdown[0].name}>{memberBreakdown[0].name}</div>
                   <div className="summary-card-sub">{formatRupiah(memberBreakdown[0].amount)}</div>
                 </div>
               ) : (
-                <div className="summary-card" style={{ borderTop: '3px solid #8b5cf6' }}>
-                  <div className="summary-card-icon" style={{ background: '#ede9fe' }}>👤</div>
+                <div className="summary-card card-peak-member">
+                  <div className="summary-card-icon">👤</div>
                   <div className="summary-card-label">{t('highest_expense')}</div>
                   <div className="summary-card-value">-</div>
                   <div className="summary-card-sub">Belum ada data</div>

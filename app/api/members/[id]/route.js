@@ -9,7 +9,7 @@ import { logActivity } from '@/lib/logger'
 export async function PUT(request, { params }) {
   try {
     const session = await getSession()
-    if (!session || session.role !== 'admin') {
+    if (!session || (session.role !== 'admin' && session.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Hanya admin yang bisa mengedit anggota' }, { status: 403 })
     }
 
@@ -80,7 +80,7 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const session = await getSession()
-    if (!session || session.role !== 'admin') {
+    if (!session || (session.role !== 'admin' && session.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Hanya admin yang bisa menonaktifkan anggota' }, { status: 403 })
     }
 

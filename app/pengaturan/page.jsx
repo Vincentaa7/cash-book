@@ -50,7 +50,7 @@ function PengaturanContent() {
   const [formFamilyName, setFormFamilyName] = useState('')
 
   useEffect(() => {
-    if (user && user.role !== 'admin') {
+    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
       router.push('/dashboard')
     }
   }, [user, router])
@@ -353,20 +353,24 @@ function PengaturanContent() {
               >
                 <Settings size={18} /> {t('app_preferences')}
               </div>
-              <div 
-                className={`nav-link ${activeTab === 'database' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('database'); fetchDbPreview() }}
-                style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'database' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
-              >
-                <Database size={18} /> Database
-              </div>
-              <div 
-                className={`nav-link ${activeTab === 'activityLog' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('activityLog'); fetchActivityLogs(1) }}
-                style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'activityLog' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
-              >
-                <ClipboardList size={18} /> {t('db_log')}
-              </div>
+              {user?.role === 'superadmin' && (
+                <>
+                  <div 
+                    className={`nav-link ${activeTab === 'database' ? 'active' : ''}`}
+                    onClick={() => { setActiveTab('database'); fetchDbPreview() }}
+                    style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'database' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
+                  >
+                    <Database size={18} /> Database
+                  </div>
+                  <div 
+                    className={`nav-link ${activeTab === 'activityLog' ? 'active' : ''}`}
+                    onClick={() => { setActiveTab('activityLog'); fetchActivityLogs(1) }}
+                    style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'activityLog' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
+                  >
+                    <ClipboardList size={18} /> {t('db_log')}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -422,8 +426,8 @@ function PengaturanContent() {
 
                   {/* Add Cash (Top-up) - Only visible if budget exists */}
                   {initialBudget > 0 && (
-                    <div style={{ padding: 20, background: '#f8fafc', borderRadius: 16, border: '1px dashed #cbd5e1' }}>
-                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ padding: 20, background: 'var(--bg-tertiary)', borderRadius: 16, border: '1px dashed var(--border-color)', transition: 'background-color 0.3s ease, border-color 0.3s ease' }}>
+                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
                          <PlusCircle size={18} color="#10b981" /> {t('add_cash')}
                       </h4>
                       <form onSubmit={handleAddBudget} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -582,7 +586,7 @@ function PengaturanContent() {
               </div>
             )}
 
-            {activeTab === 'database' && (
+            {user?.role === 'superadmin' && activeTab === 'database' && (
               <div className="card fade-in-up">
                 <div className="card-header">
                   <h3 className="card-title"><Database size={18} /> {t('db_management')}</h3>
@@ -710,7 +714,7 @@ function PengaturanContent() {
               </div>
             )}
 
-            {activeTab === 'activityLog' && (
+            {user?.role === 'superadmin' && activeTab === 'activityLog' && (
               <div className="card fade-in-up">
                 <div className="card-header">
                   <h3 className="card-title">📋 {t('db_log')}</h3>

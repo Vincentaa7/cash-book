@@ -23,8 +23,8 @@ export async function GET(request) {
     if (!session) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
-    if (session.role !== 'admin') {
-      return NextResponse.json({ error: 'Hanya admin yang bisa mengakses' }, { status: 403 })
+    if (session.role !== 'superadmin') {
+      return NextResponse.json({ error: 'Hanya superadmin yang bisa mengakses' }, { status: 403 })
     }
 
     const cutoff = getCutoffDate()
@@ -91,8 +91,8 @@ export async function POST(request) {
     if (!session) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
-    if (session.role !== 'admin') {
-      return NextResponse.json({ error: 'Hanya admin yang bisa mengakses' }, { status: 403 })
+    if (session.role !== 'superadmin') {
+      return NextResponse.json({ error: 'Hanya superadmin yang bisa mengakses' }, { status: 403 })
     }
 
     const cutoff = getCutoffDate()

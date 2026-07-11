@@ -159,7 +159,7 @@ export default function TransaksiPage() {
     setDeleteLoading(false)
   }
 
-  const totalFiltered = transactions.reduce((s, t) => s + t.amount, 0)
+  const totalFiltered = transactions.filter(t => t.category !== 'pemasukan').reduce((s, t) => s + Number(t.amount), 0)
 
   return (
     <AppShell>
@@ -339,7 +339,7 @@ export default function TransaksiPage() {
                           )}
                         </td>
                         <td className="hide-on-mobile"><CategoryBadge category={tx.category} size="sm" /></td>
-                        <td style={{ fontWeight: 700, color: '#ef4444', textAlign: 'right', fontSize: '0.85rem' }}>
+                        <td style={{ fontWeight: 700, color: tx.category === 'pemasukan' ? 'var(--color-success)' : '#ef4444', textAlign: 'right', fontSize: '0.85rem' }}>
                           {formatRupiah(tx.amount)}
                         </td>
                         <td className="hide-on-mobile">

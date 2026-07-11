@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
   LayoutDashboard, PlusCircle, List, BarChart2,
-  Settings, LogOut, Sun, Moon
+  Settings, LogOut, Sun, Moon, Calendar
 } from 'lucide-react'
 import { getInitials } from '@/lib/constants'
 import { useLanguage } from '@/components/LanguageContext'
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: '/transaksi/baru', labelKey: 'add_expense', icon: PlusCircle },
   { href: '/transaksi', labelKey: 'history', icon: List },
   { href: '/laporan', labelKey: 'reports', icon: BarChart2 },
+  { href: '/kalender', labelKey: 'calendar', icon: Calendar },
   { href: '/pengaturan', labelKey: 'settings', icon: Settings, adminOnly: true },
 ]
 
@@ -33,7 +34,7 @@ export default function AppShell({ children }) {
 
   // Cek Pindahan Saldo (Hanya jika admin & login)
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' || user?.role === 'superadmin') {
       checkCarryOver()
     }
   }, [user])
@@ -68,7 +69,7 @@ export default function AppShell({ children }) {
   }
 
   const visibleNavItems = NAV_ITEMS.filter(item =>
-    !item.adminOnly || user?.role === 'admin'
+    !item.adminOnly || user?.role === 'admin' || user?.role === 'superadmin'
   )
 
   if (loading || !user) {
@@ -133,7 +134,9 @@ export default function AppShell({ children }) {
             </div>
             <div className="user-info">
               <div className="user-name">{user.name}</div>
-              <div className="user-role">{user.role === 'admin' ? 'Admin' : 'Member'}</div>
+              <div className="user-role">
+                {user.role === 'superadmin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : 'Member'}
+              </div>
             </div>
             <button
               onClick={handleLogout}
@@ -161,6 +164,9 @@ export default function AppShell({ children }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 5 }}>
+            <Link href="/kalender" className="btn-icon" title={t('calendar')}>
+              <Calendar size={18} />
+            </Link>
             <button onClick={toggleTheme} className="btn-icon">
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </button>

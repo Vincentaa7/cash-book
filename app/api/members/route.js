@@ -35,7 +35,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const session = await getSession()
-    if (!session || session.role !== 'admin') {
+    if (!session || (session.role !== 'admin' && session.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Hanya admin yang bisa menambah anggota' }, { status: 403 })
     }
 
