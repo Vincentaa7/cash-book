@@ -434,6 +434,11 @@ img { max-width: 100%; display: block; }
   overflow: hidden;
 }
 
+[data-theme="dark"] .modal-premium {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
 /* Reminder Banner untuk Dashboard */
 .reminder-banner {
   background: linear-gradient(90deg, #ecfdf5 0%, #ffffff 50%, #ecfdf5 100%);
@@ -454,6 +459,12 @@ img { max-width: 100%; display: block; }
 .reminder-banner:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+}
+
+[data-theme="dark"] .reminder-banner {
+  background: linear-gradient(90deg, rgba(16,185,129,0.1) 0%, rgba(16,185,129,0.05) 50%, rgba(16,185,129,0.1) 100%);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: var(--text-primary);
 }
 
 /* ============================================================
@@ -883,10 +894,13 @@ img { max-width: 100%; display: block; }
 .badge-purple { background: #ede9fe; color: #7c3aed; }
 .badge-gray   { background: var(--bg-tertiary); color: var(--text-secondary); }
 
-[data-theme="dark"] .badge-teal   { background: rgba(13,148,136,0.2); color: var(--color-primary-300); }
-[data-theme="dark"] .badge-green  { background: rgba(16,185,129,0.2); color: #6ee7b7; }
-[data-theme="dark"] .badge-red    { background: rgba(239,68,68,0.2);  color: #fca5a5; }
-[data-theme="dark"] .badge-yellow { background: rgba(245,158,11,0.2); color: #fcd34d; }
+[data-theme="dark"] .badge-teal   { background: rgba(13,148,136,0.2);  color: #5eead4; }
+[data-theme="dark"] .badge-green  { background: rgba(16,185,129,0.2);  color: #6ee7b7; }
+[data-theme="dark"] .badge-red    { background: rgba(239,68,68,0.2);   color: #fca5a5; }
+[data-theme="dark"] .badge-yellow { background: rgba(245,158,11,0.2);  color: #fcd34d; }
+[data-theme="dark"] .badge-blue   { background: rgba(59,130,246,0.2);  color: #93c5fd; }
+[data-theme="dark"] .badge-purple { background: rgba(124,58,237,0.2);  color: #c4b5fd; }
+[data-theme="dark"] .badge-gray   { background: rgba(255,255,255,0.07); color: var(--text-secondary); }
 
 /* ============================================================
    Alert / Notification
@@ -1920,6 +1934,7 @@ img { max-width: 100%; display: block; }
   border-radius: var(--border-radius);
   border: 2px solid var(--border-color);
   background: var(--bg-secondary);
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: center;
@@ -1927,10 +1942,22 @@ img { max-width: 100%; display: block; }
   outline: none;
 }
 
+[data-theme="dark"] .category-grid-item {
+  background: var(--bg-tertiary);
+  border-color: #2d3748;
+  color: var(--text-primary);
+}
+
 .category-grid-item:hover {
   border-color: var(--color-primary-400);
   background: var(--bg-tertiary);
   transform: translateY(-2px);
+}
+
+[data-theme="dark"] .category-grid-item:hover {
+  background: #2d3748;
+  border-color: var(--color-primary-400);
+  color: var(--text-primary);
 }
 
 .category-grid-item.active {
@@ -1943,8 +1970,9 @@ img { max-width: 100%; display: block; }
 }
 
 [data-theme="dark"] .category-grid-item.active {
-  background: rgba(13, 148, 136, 0.15);
-  color: var(--color-primary-400);
+  background: rgba(13, 148, 136, 0.2);
+  border-color: var(--color-primary-400);
+  color: #5eead4;
 }
 
 .category-grid-item-emoji {
@@ -1959,6 +1987,8 @@ img { max-width: 100%; display: block; }
 
 .category-grid-item-label {
   font-size: 0.8rem;
+  color: inherit;
+  line-height: 1.3;
 }
 
 /* Quick Amount Shortcut Buttons */
