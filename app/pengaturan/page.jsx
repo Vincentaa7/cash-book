@@ -480,12 +480,14 @@ function PengaturanContent() {
                       {members.map(m => (
                         <tr key={m.id} style={{ opacity: m.isActive ? 1 : 0.6 }}>
                           <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                               <div style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', background: m.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '0.8rem' }}>
                                 {m.name.substring(0,2).toUpperCase()}
                               </div>
-                              <span style={{ fontWeight: 500 }}>{m.name}</span>
-                              {m.id === user.id && <span className="badge badge-gray mx-2" style={{marginLeft: 8}}>{t('you_label')}</span>}
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <span style={{ fontWeight: 500, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{m.name}</span>
+                                {m.id === user.id && <span className="badge badge-gray" style={{ marginTop: 2, display: 'inline-flex' }}>{t('you_label')}</span>}
+                              </div>
                             </div>
                           </td>
                           <td className="hide-on-mobile">

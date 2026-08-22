@@ -10,6 +10,8 @@ const COOKIE_NAME = 'cash-book-session'
 const PUBLIC_ROUTES = ['/login']
 // Route yang butuh role admin
 const ADMIN_ROUTES = ['/pengaturan']
+// Route yang bisa diakses semua member (eksplisit whitelist — tidak perlu tindakan khusus,
+// cukup pastikan /pribadi tidak masuk ADMIN_ROUTES)
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl

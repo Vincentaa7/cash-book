@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
   LayoutDashboard, PlusCircle, List, BarChart2,
-  Settings, LogOut, Sun, Moon, Calendar
+  Settings, LogOut, Sun, Moon, Calendar, BookOpen
 } from 'lucide-react'
 import { getInitials } from '@/lib/constants'
 import { useLanguage } from '@/components/LanguageContext'
@@ -16,12 +16,13 @@ import CarryOverModal from '@/components/CarryOverModal'
 import AiChatWidget from '@/components/AiChatWidget'
 
 const NAV_ITEMS = [
-  { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
-  { href: '/transaksi/baru', labelKey: 'add_expense', icon: PlusCircle },
-  { href: '/transaksi', labelKey: 'history', icon: List },
-  { href: '/laporan', labelKey: 'reports', icon: BarChart2 },
-  { href: '/kalender', labelKey: 'calendar', icon: Calendar },
-  { href: '/pengaturan', labelKey: 'settings', icon: Settings, adminOnly: true },
+  { href: '/dashboard',    labelKey: 'dashboard',      icon: LayoutDashboard },
+  { href: '/transaksi/baru', labelKey: 'add_expense',  icon: PlusCircle },
+  { href: '/transaksi',    labelKey: 'history',         icon: List },
+  { href: '/laporan',      labelKey: 'reports',         icon: BarChart2 },
+  { href: '/kalender',     labelKey: 'calendar',        icon: Calendar },
+  { href: '/pribadi',      labelKey: 'personal_ledger', icon: BookOpen },
+  { href: '/pengaturan',   labelKey: 'settings',        icon: Settings, adminOnly: true },
 ]
 
 export default function AppShell({ children }) {

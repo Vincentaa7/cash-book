@@ -20,9 +20,11 @@ model Member {
   createdAt   DateTime @default(now()) @map("created_at")
 
   // Relasi
-  transactions   Transaction[]   @relation("MemberTransactions")
-  budgets        MonthlyBudget[] @relation("MemberBudgets")
-  activityLogs   ActivityLog[]   @relation("MemberActivityLogs")
+  transactions         Transaction[]         @relation("MemberTransactions")
+  budgets              MonthlyBudget[]       @relation("MemberBudgets")
+  activityLogs         ActivityLog[]         @relation("MemberActivityLogs")
+  personalTransactions PersonalTransaction[] @relation("MemberPersonalTx")
+  personalBudgets      PersonalBudget[]      @relation("MemberPersonalBudgets")
 
   @@map("members")
 }
@@ -101,3 +103,40 @@ model ActivityLog {
   @@index([memberId])
   @@map("activity_logs")
 }
+
+// Catatan pengeluaran/pemasukan pribadi per-anggota (tidak mempengaruhi kas keluarga)
+model PersonalTransaction {
+  id          String    @id @default(uuid()) @db.Char(36)
+  memberId    String    @map("member_id") @db.Char(36)
+  itemName    String    @map("item_name") @db.VarChar(255)
+  amount      BigInt    // dalam Rupiah
+  type        String    @default("expense") @db.VarChar(10) // 'expense' | 'income'
+  category    String    @db.VarChar(100)
+  date        DateTime  @db.Date
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+
+  member Member @relation("MemberPersonalTx", fields: [memberId], references: [id])
+
+  @@index([memberId])
+  @@index([date])
+  @@map("personal_transactions")
+}
+
+// Saldo utama / Kas pribadi yang dialokasikan per anggota per bulan
+model PersonalBudget {
+  id        String   @id @default(uuid()) @db.Char(36)
+  memberId  String   @map("member_id") @db.Char(36)
+  month     Int      // 1-12
+  year      Int
+  amount    BigInt   // Saldo utama pribadi (Rupiah)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  member Member @relation("MemberPersonalBudgets", fields: [memberId], references: [id])
+
+  @@unique([memberId, month, year], name: "uq_personal_budget")
+  @@map("personal_budgets")
+}
+

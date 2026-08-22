@@ -302,7 +302,7 @@ export default function TransaksiPage() {
                 <tbody>
                   {transactions.map(tx => {
                     const isOwner = tx.memberId === user?.id
-                    const isAdmin = user?.role === 'admin'
+                    const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
                     const within24h = (Date.now() - new Date(tx.createdAt).getTime()) < 86400000
                     const canEdit = isAdmin || (isOwner && within24h)
                     const canDelete = isAdmin
