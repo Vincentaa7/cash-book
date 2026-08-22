@@ -1449,6 +1449,19 @@ img { max-width: 100%; display: block; }
     width: 100%;
   }
 
+  /* Semua cell tabel tidak boleh overflow keluar batas */
+  .table td, .table th {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-word;
+  }
+
+  /* Flex container di dalam cell tabel tidak boleh melebihi lebar cell */
+  .table td > div {
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .table th:first-child, .table td:first-child {
     padding-left: 12px !important;
   }

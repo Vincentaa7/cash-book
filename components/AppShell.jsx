@@ -168,6 +168,9 @@ export default function AppShell({ children }) {
             <Link href="/kalender" className="btn-icon" title={t('calendar')}>
               <Calendar size={18} />
             </Link>
+            <Link href="/pribadi" className={`btn-icon${pathname.startsWith('/pribadi') ? ' text-primary' : ''}`} title={t('personal_ledger')}>
+              <BookOpen size={18} style={pathname.startsWith('/pribadi') ? { color: 'var(--color-primary-500)' } : {}} />
+            </Link>
             <button onClick={toggleTheme} className="btn-icon">
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
@@ -216,9 +219,9 @@ export default function AppShell({ children }) {
               <PlusCircle size={24} />
             </Link>
           </div>
-          <Link href="/laporan" className={`bottom-nav-item ${pathname === '/laporan' ? 'active' : ''}`}>
-            <BarChart2 size={20} />
-            <span>{t('reports')}</span>
+          <Link href="/pribadi" className={`bottom-nav-item ${pathname.startsWith('/pribadi') ? 'active' : ''}`}>
+            <BookOpen size={20} />
+            <span>Kas Pribadi</span>
           </Link>
           <Link href="/pengaturan" className={`bottom-nav-item ${pathname === '/pengaturan' ? 'active' : ''}`}>
             <Settings size={20} />

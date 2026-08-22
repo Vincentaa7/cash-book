@@ -761,8 +761,8 @@ function PengaturanContent() {
                           <tbody>
                             {activityLogs.map(log => (
                               <tr key={log.id}>
-                                <td>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <td style={{ maxWidth: 120 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                                     <div style={{
                                       width: 28,
                                       height: 28,
@@ -778,7 +778,15 @@ function PengaturanContent() {
                                     }}>
                                       {log.member?.name?.substring(0, 2).toUpperCase() || 'S'}
                                     </div>
-                                    <span style={{ fontWeight: 500, fontSize: '0.85rem' }}>{log.member?.name || 'Sistem'}</span>
+                                    <span style={{
+                                      fontWeight: 500,
+                                      fontSize: '0.78rem',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                      minWidth: 0,
+                                      flex: 1
+                                    }}>{log.member?.name || 'Sistem'}</span>
                                   </div>
                                 </td>
                                 <td style={{ fontSize: '0.85rem', lineHeight: 1.4 }}>
