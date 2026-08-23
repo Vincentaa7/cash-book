@@ -8,8 +8,8 @@ import { useUser } from '@/components/UserContext'
 import CategoryBadge from '@/components/CategoryBadge'
 import { formatRupiah, formatDate, formatMonthYear, calcPercentage, formatNumber } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo } from '@/lib/constants'
-import { Download, FileText, Filter } from 'lucide-react'
-import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis } from 'recharts'
+import { Download, FileText, Filter, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 export default function LaporanPage() {
   const { t, language } = useLanguage()
@@ -144,6 +144,140 @@ export default function LaporanPage() {
   function handleExport() {
     const params = new URLSearchParams({ startDate, endDate })
     window.location.href = `/api/transactions/export?${params}`
+  }
+
+  async function handleExportPDF() {
+    try {
+      // Dynamic import agar tidak mempengaruhi bundle size saat halaman pertama dimuat
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW = doc.internal.pageSize.getWidth()
+      const now = new Date()
+
+      // === KOP SURAT ===
+      doc.setFillColor(13, 148, 136)
+      doc.rect(0, 0, pageW, 28, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(16)
+      doc.text('LAPORAN KEUANGAN KELUARGA', pageW / 2, 11, { align: 'center' })
+      doc.setFontSize(11)
+      doc.text(`Buku Kas: ${familyName || ''}`, pageW / 2, 19, { align: 'center' })
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Dicetak: ${now.toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })}`, pageW / 2, 25, { align: 'center' })
+
+      // === PERIODE ===
+      doc.setTextColor(30, 41, 59)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.text(`Periode: ${startDate} s/d ${endDate}`, 14, 36)
+      doc.setDrawColor(13, 148, 136)
+      doc.setLineWidth(0.5)
+      doc.line(14, 38, pageW - 14, 38)
+
+      let curY = 44
+
+      // === RINGKASAN ANGGARAN ===
+      if (dashboardSummary) {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.setTextColor(100, 116, 139)
+        doc.text('I. RINGKASAN ANGGARAN KAS', 14, curY)
+        curY += 4
+        autoTable(doc, {
+          startY: curY,
+          head: [['Parameter', 'Nominal']],
+          body: [
+            ['Total Anggaran', formatRupiah(dashboardSummary.totalBudget)],
+            ['Total Pengeluaran', formatRupiah(dashboardSummary.totalExpense)],
+            ['Sisa Anggaran', formatRupiah(dashboardSummary.remaining)],
+            ['Persentase Terpakai', `${dashboardSummary.budgetPercentUsed}%`],
+          ],
+          headStyles: { fillColor: [13, 148, 136], textColor: 255, fontSize: 8 },
+          bodyStyles: { fontSize: 8 },
+          columnStyles: { 1: { halign: 'right' } },
+          margin: { left: 14, right: 14 },
+          theme: 'striped',
+        })
+        curY = doc.lastAutoTable.finalY + 8
+      }
+
+      // === BREAKDOWN KATEGORI ===
+      if (catBreakdown.length > 0) {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.setTextColor(100, 116, 139)
+        doc.text('II. BREAKDOWN KATEGORI PENGELUARAN', 14, curY)
+        curY += 4
+        autoTable(doc, {
+          startY: curY,
+          head: [['Kategori', 'Total', '%']],
+          body: catBreakdown.map(({ category: cat, amount }) => {
+            const info = getCategoryInfo(cat)
+            const pct = calcPercentage(amount, totalExpense)
+            return [`${info.emoji} ${cat}`, formatRupiah(amount), `${pct}%`]
+          }),
+          headStyles: { fillColor: [13, 148, 136], textColor: 255, fontSize: 8 },
+          bodyStyles: { fontSize: 8 },
+          columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+          margin: { left: 14, right: 14 },
+          theme: 'striped',
+        })
+        curY = doc.lastAutoTable.finalY + 8
+      }
+
+      // === TABEL TRANSAKSI ===
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(100, 116, 139)
+      doc.text(`III. DAFTAR TRANSAKSI (${transactions.length} transaksi)`, 14, curY)
+      curY += 4
+      autoTable(doc, {
+        startY: curY,
+        head: [['Tanggal', 'Item / Keperluan', 'Kategori', 'Anggota', 'Jumlah']],
+        body: transactions.map(tx => [
+          formatDate(tx.transactionDate, 'id'),
+          tx.itemName + (tx.notes ? `\n(${tx.notes})` : ''),
+          tx.category,
+          tx.member?.name || '-',
+          formatRupiah(tx.amount),
+        ]),
+        foot: [['', '', '', 'TOTAL', formatRupiah(totalExpense)]],
+        headStyles: { fillColor: [13, 148, 136], textColor: 255, fontSize: 7.5 },
+        bodyStyles: { fontSize: 7.5 },
+        footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold', fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 22 },
+          4: { halign: 'right' },
+        },
+        margin: { left: 14, right: 14 },
+        theme: 'striped',
+      })
+
+      // === FOOTER TANDA TANGAN ===
+      const finalY = doc.lastAutoTable.finalY + 14
+      const pageH = doc.internal.pageSize.getHeight()
+      const sigY = Math.min(finalY, pageH - 40)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(71, 85, 105)
+      doc.text('Dilaporkan Oleh,', 14, sigY + 4)
+      doc.line(14, sigY + 22, 70, sigY + 22)
+      doc.text('Admin / Pengelola Kas', 14, sigY + 26)
+      doc.text('Disetujui Oleh,', pageW - 70, sigY + 4)
+      doc.line(pageW - 70, sigY + 22, pageW - 14, sigY + 22)
+      doc.text('Kepala Keluarga', pageW - 70, sigY + 26)
+
+      // Simpan PDF
+      const fileName = `laporan-keuangan-${startDate}-${endDate}.pdf`
+      doc.save(fileName)
+    } catch (err) {
+      console.error('PDF export error:', err)
+      alert('Gagal membuat PDF. Silakan coba lagi.')
+    }
   }
 
   function handlePrint() {
@@ -366,11 +500,14 @@ export default function LaporanPage() {
             <h1>{t('reports')} 📄</h1>
             <p>{t('digital_cashbook')}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="btn btn-ghost btn-sm" onClick={handleExport}>
               <Download size={15} /> {t('actions')} CSV
             </button>
-            <button className="btn btn-secondary btn-sm" onClick={handlePrint}>
+            <button className="btn btn-secondary btn-sm" onClick={handleExportPDF} style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', border: 'none' }}>
+              <FileText size={15} /> Export PDF
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={handlePrint}>
               <FileText size={15} /> {t('print_report')}
             </button>
           </div>
@@ -645,33 +782,98 @@ export default function LaporanPage() {
               </div>
             </div>
 
-            {/* Grafik Perbandingan Bulanan */}
-            {compareData && (
+            {/* Grafik Perbandingan 6 Bulan */}
+            {compareData && compareData.history && (
               <div className="card" style={{ marginTop: 24 }}>
-                <div className="card-header">
-                  <h3 className="card-title">📊 {t('compare_title')}</h3>
+                <div className="card-header" style={{ flexWrap: 'wrap', gap: 8 }}>
+                  <h3 className="card-title">📊 Tren 6 Bulan Terakhir</h3>
+                  {/* Summary naik/turun */}
+                  {compareData.previous?.amount > 0 && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem',
+                      padding: '4px 12px', borderRadius: 99, fontWeight: 700,
+                      background: compareData.changeTrend === 'up'
+                        ? 'rgba(239,68,68,0.12)'
+                        : compareData.changeTrend === 'down'
+                        ? 'rgba(16,185,129,0.12)'
+                        : 'rgba(100,116,139,0.12)',
+                      color: compareData.changeTrend === 'up' ? '#ef4444'
+                        : compareData.changeTrend === 'down' ? '#10b981' : '#64748b',
+                    }}>
+                      {compareData.changeTrend === 'up'
+                        ? <TrendingUp size={14} />
+                        : compareData.changeTrend === 'down'
+                        ? <TrendingDown size={14} />
+                        : <Minus size={14} />}
+                      {Math.abs(compareData.changePercent)}%
+                      {compareData.changeTrend === 'up' ? ' lebih boros' : compareData.changeTrend === 'down' ? ' lebih hemat' : ' sama'}
+                      {' '}vs bulan lalu
+                    </div>
+                  )}
                 </div>
                 <div className="card-body">
-                  <div style={{ height: 260, width: '100%' }}>
+                  {/* Summary cards: bulan ini vs bulan lalu vs rata-rata */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
+                    <div style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, borderLeft: '4px solid var(--color-primary-500)' }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Bulan Ini</div>
+                      <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--color-primary-600)' }}>{formatRupiah(compareData.current?.amount || 0)}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                        {formatMonthYear(compareData.current?.month, compareData.current?.year, language)}
+                      </div>
+                    </div>
+                    <div style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, borderLeft: '4px solid #64748b' }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Bulan Lalu</div>
+                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#64748b' }}>{formatRupiah(compareData.previous?.amount || 0)}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                        {formatMonthYear(compareData.previous?.month, compareData.previous?.year, language)}
+                      </div>
+                    </div>
+                    <div style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, borderLeft: '4px solid #f59e0b' }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Rata-rata 3 Bln</div>
+                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#d97706' }}>{formatRupiah(compareData.avg3Months || 0)}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>per bulan</div>
+                    </div>
+                  </div>
+
+                  {/* Bar Chart 6 bulan */}
+                  <div style={{ height: 240, width: '100%' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={[
-                          { name: t('compare_current'), amount: compareData.current.amount, color: 'var(--color-primary-600)' },
-                          { name: t('compare_prev'), amount: compareData.previous.amount, color: '#64748b' },
-                          { name: t('compare_avg'), amount: compareData.avg3Months, color: '#f59e0b' }
-                        ]}
-                        margin={{ top: 20, right: 20, left: 10, bottom: 5 }}
+                        data={compareData.history.map((h, idx) => ({
+                          name: formatMonthYear(h.month, h.year, language).slice(0, 8),
+                          amount: h.amount,
+                          isCurrent: idx === 5,
+                        }))}
+                        margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
                       >
-                        <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={12} tickLine={false} />
-                        <YAxis stroke="var(--text-secondary)" fontSize={11} tickLine={false} tickFormatter={v => formatNumber(v)} />
-                        <Tooltip formatter={v => formatRupiah(v)} contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', borderRadius: 8, color: 'var(--text-primary)' }} />
-                        <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={60}>
-                          <Cell fill="var(--color-primary-600)" />
-                          <Cell fill="#64748b" />
-                          <Cell fill="#f59e0b" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
+                        <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={10} tickLine={false} />
+                        <YAxis stroke="var(--text-secondary)" fontSize={10} tickLine={false} tickFormatter={v => formatNumber(v)} width={60} />
+                        <Tooltip
+                          formatter={v => formatRupiah(v)}
+                          contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', borderRadius: 8, color: 'var(--text-primary)', fontSize: '0.8rem' }}
+                        />
+                        <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                          {compareData.history.map((_, idx) => (
+                            <Cell key={idx} fill={idx === 5 ? 'var(--color-primary-500)' : idx === 4 ? '#94a3b8' : '#cbd5e1'} />
+                          ))}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 8, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--color-primary-500)', display: 'inline-block' }} />
+                      Bulan ini
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: '#94a3b8', display: 'inline-block' }} />
+                      Bulan lalu
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: '#cbd5e1', display: 'inline-block' }} />
+                      Sebelumnya
+                    </span>
                   </div>
                 </div>
               </div>

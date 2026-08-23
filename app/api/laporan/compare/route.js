@@ -1,4 +1,4 @@
-// app/api/laporan/compare/route.js - Get Monthly Expense Comparison
+// app/api/laporan/compare/route.js - Get Monthly Expense Comparison (6 months)
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
@@ -16,7 +16,7 @@ async function getMonthExpense(month, year, cutoffDate) {
     })
     expenseAmount = Number(snapshotAgg._sum.totalAmount || 0)
 
-    // Jika snapshot kosong, coba fallback ke transactions (mungkin belum dicleanup)
+    // Jika snapshot kosong, coba fallback ke transactions
     if (expenseAmount === 0) {
       const txAgg = await prisma.transaction.aggregate({
         where: { transactionDate: { gte: firstDay, lte: lastDay } },
@@ -35,6 +35,15 @@ async function getMonthExpense(month, year, cutoffDate) {
   return expenseAmount
 }
 
+// Helper: offset month by N steps
+function offsetMonth(month, year, offsetMonths) {
+  let m = month + offsetMonths
+  let y = year
+  while (m <= 0) { m += 12; y -= 1 }
+  while (m > 12) { m -= 12; y += 1 }
+  return { month: m, year: y }
+}
+
 export async function GET(request) {
   try {
     const session = await getSession()
@@ -47,39 +56,43 @@ export async function GET(request) {
     const month = parseInt(searchParams.get('month')) || now.getMonth() + 1
     const year = parseInt(searchParams.get('year')) || now.getFullYear()
 
-    // Hitung cutoff date untuk arsip (90 hari)
+    // Cutoff date untuk arsip (90 hari)
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - 90)
     cutoffDate.setHours(0, 0, 0, 0)
 
-    // 1. Bulan target
-    const expenseCurrent = await getMonthExpense(month, year, cutoffDate)
-
-    // 2. Bulan lalu
-    let prevM = month - 1
-    let prevY = year
-    if (prevM === 0) {
-      prevM = 12
-      prevY -= 1
+    // Ambil 6 bulan: current + 5 bulan sebelumnya
+    const months6 = []
+    for (let i = -5; i <= 0; i++) {
+      const { month: m, year: y } = offsetMonth(month, year, i)
+      const amount = await getMonthExpense(m, y, cutoffDate)
+      months6.push({ month: m, year: y, amount })
     }
-    const expensePrev = await getMonthExpense(prevM, prevY, cutoffDate)
 
-    // 3. Dua bulan lalu
-    let prev2M = month - 2
-    let prev2Y = year
-    if (prev2M <= 0) {
-      prev2M += 12
-      prev2Y -= 1
+    // Current & previous
+    const current = months6[5]  // index 5 = bulan target
+    const previous = months6[4] // index 4 = bulan lalu
+
+    // Rata-rata 3 bulan terakhir (3 bulan sebelum current)
+    const avg3Months = Math.round(
+      (months6[3].amount + months6[4].amount + months6[5].amount) / 3
+    )
+
+    // Persentase perubahan: current vs previous
+    let changePercent = 0
+    let changeTrend = 'same' // 'up' | 'down' | 'same'
+    if (previous.amount > 0) {
+      changePercent = Math.round(((current.amount - previous.amount) / previous.amount) * 100)
+      changeTrend = changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'same'
     }
-    const expensePrev2 = await getMonthExpense(prev2M, prev2Y, cutoffDate)
-
-    // 4. Rata-rata 3 bulan terakhir
-    const avg3Months = Math.round((expenseCurrent + expensePrev + expensePrev2) / 3)
 
     return NextResponse.json({
-      current: { month, year, amount: expenseCurrent },
-      previous: { month: prevM, year: prevY, amount: expensePrev },
+      current,
+      previous,
       avg3Months,
+      changePercent,
+      changeTrend,
+      history: months6, // Array 6 bulan untuk bar chart
     })
   } catch (error) {
     console.error('Get comparison error:', error)

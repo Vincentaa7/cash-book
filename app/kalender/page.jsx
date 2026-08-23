@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import AppShell from '@/components/AppShell'
 import { useLanguage } from '@/components/LanguageContext'
 import { formatRupiah, formatMonthYear } from '@/lib/format'
@@ -15,6 +15,11 @@ export default function CalendarPage() {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState(null) // number
+  const [slideDir, setSlideDir] = useState(null) // 'left' | 'right' | null for animation
+
+  // --- Swipe gesture refs ---
+  const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
 
   const fetchMonthTransactions = useCallback(async () => {
     setLoading(true)
@@ -36,6 +41,14 @@ export default function CalendarPage() {
     fetchMonthTransactions()
     setSelectedDay(null)
   }, [fetchMonthTransactions])
+
+  // Clear slide animation after it finishes
+  useEffect(() => {
+    if (slideDir) {
+      const timer = setTimeout(() => setSlideDir(null), 320)
+      return () => clearTimeout(timer)
+    }
+  }, [slideDir])
 
   // Hitung jumlah hari di bulan berjalan
   const daysInMonth = new Date(year, month, 0).getDate()
@@ -67,6 +80,7 @@ export default function CalendarPage() {
 
   // Navigasi Bulan
   function handlePrevMonth() {
+    setSlideDir('right')
     if (month === 1) {
       setMonth(12)
       setYear(y => y - 1)
@@ -77,12 +91,32 @@ export default function CalendarPage() {
 
   // Navigasi Bulan berikutnya
   function handleNextMonth() {
+    setSlideDir('left')
     if (month === 12) {
       setMonth(1)
       setYear(y => y + 1)
     } else {
       setMonth(m => m + 1)
     }
+  }
+
+  // --- Touch / Swipe Handlers ---
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  function handleTouchEnd(e) {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current)
+    // Trigger jika horizontal swipe dominan dan > 50px
+    if (Math.abs(dx) > 50 && Math.abs(dx) > dy) {
+      if (dx < 0) handleNextMonth() // swipe kiri → bulan berikutnya
+      else handlePrevMonth()        // swipe kanan → bulan sebelumnya
+    }
+    touchStartX.current = null
+    touchStartY.current = null
   }
 
   // Menentukan kelas warna intensitas pengeluaran
@@ -161,15 +195,20 @@ export default function CalendarPage() {
 
         {/* Main Grid: Calendar & Day Detail */}
         <div className="calendar-layout-grid">
-          {/* Box Kalender */}
-          <div className="card" style={{ padding: 20 }}>
+          {/* Box Kalender — touch events untuk swipe di mobile */}
+          <div
+            className="card"
+            style={{ padding: 20, touchAction: 'pan-y' }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
             {loading ? (
               <div className="loading-container" style={{ padding: '60px 0' }}>
                 <div className="spinner" />
                 <p>{t('loading')}</p>
               </div>
             ) : (
-              <div className="calendar-grid-wrapper">
+              <div className={`calendar-grid-wrapper cal-slide-${slideDir || 'none'}`}>
                 {/* Header Hari */}
                 <div className="calendar-days-header">
                   {dayLabels.map((lbl, idx) => (
@@ -456,6 +495,27 @@ export default function CalendarPage() {
             padding: 1px 2px;
           }
         }
+
+        /* === Swipe slide animations === */
+        @keyframes slideInFromLeft {
+          from { opacity: 0; transform: translateX(-28px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideInFromRight {
+          from { opacity: 0; transform: translateX(28px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .cal-slide-left {
+          animation: slideInFromLeft 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .cal-slide-right {
+          animation: slideInFromRight 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .cal-slide-none {
+          animation: none;
+        }
+
       `}</style>
     </AppShell>
   )
