@@ -219,9 +219,9 @@ export default function AppShell({ children }) {
               <PlusCircle size={24} />
             </Link>
           </div>
-          <Link href="/pribadi" className={`bottom-nav-item ${pathname.startsWith('/pribadi') ? 'active' : ''}`}>
-            <BookOpen size={20} />
-            <span>Kas Pribadi</span>
+          <Link href="/laporan" className={`bottom-nav-item ${pathname === '/laporan' ? 'active' : ''}`}>
+            <BarChart2 size={20} />
+            <span>{t('reports')}</span>
           </Link>
           <Link href="/pengaturan" className={`bottom-nav-item ${pathname === '/pengaturan' ? 'active' : ''}`}>
             <Settings size={20} />

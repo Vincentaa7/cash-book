@@ -287,16 +287,16 @@ export default function TransaksiPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th className="sortable" onClick={() => handleSort('transactionDate')} style={{ width: '22%' }}>
+                    <th className="sortable" onClick={() => handleSort('transactionDate')} style={{ width: '18%' }}>
                       {t('date')} {sortBy === 'transactionDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
-                    <th style={{ width: '35%' }}>{t('item_name')}</th>
+                    <th style={{ width: '37%' }}>{t('item_name')}</th>
                     <th className="hide-on-mobile" style={{ width: '15%' }}>{t('category')}</th>
-                    <th className="sortable" onClick={() => handleSort('amount')} style={{ width: '28%', textAlign: 'right' }}>
+                    <th className="sortable" onClick={() => handleSort('amount')} style={{ width: '25%', textAlign: 'right' }}>
                       {t('amount')} {sortBy === 'amount' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
                     </th>
                     <th className="hide-on-mobile" style={{ width: '15%' }}>{t('member_name')}</th>
-                    <th style={{ width: '15%', textAlign: 'center' }}>{t('actions')}</th>
+                    <th style={{ width: '20%', textAlign: 'center' }}>{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -355,15 +355,25 @@ export default function TransaksiPage() {
                             <span style={{ fontSize: '0.85rem' }}>{tx.member?.name || '-'}</span>
                           </div>
                         </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' }}>
                             {canEdit && (
-                              <button className="btn-icon" onClick={() => openEdit(tx)} title="Edit">
+                              <button
+                                className="btn-icon"
+                                onClick={() => openEdit(tx)}
+                                title="Edit"
+                                style={{ flexShrink: 0, minWidth: 28, minHeight: 28 }}
+                              >
                                 <Edit2 size={14} />
                               </button>
                             )}
                             {canDelete && (
-                              <button className="btn-icon" onClick={() => setDeleteTx(tx)} title="Hapus" style={{ color: '#ef4444' }}>
+                              <button
+                                className="btn-icon"
+                                onClick={() => setDeleteTx(tx)}
+                                title="Hapus"
+                                style={{ color: '#ef4444', flexShrink: 0, minWidth: 28, minHeight: 28 }}
+                              >
                                 <Trash2 size={14} />
                               </button>
                             )}
