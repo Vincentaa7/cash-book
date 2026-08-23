@@ -586,11 +586,11 @@ export default function PribadiPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th style={{ width: '18%' }}>{t('date')}</th>
-                    <th style={{ width: '38%' }}>{t('item_name')}</th>
+                    <th style={{ width: '16%' }}>{t('date')}</th>
+                    <th style={{ width: '34%' }}>{t('item_name')}</th>
                     <th className="hide-on-mobile" style={{ width: '18%' }}>Kategori</th>
-                    <th style={{ width: '22%', textAlign: 'right' }}>{t('amount')}</th>
-                    <th style={{ width: '8%', textAlign: 'center' }}>{t('actions')}</th>
+                    <th style={{ width: '20%', textAlign: 'right' }}>{t('amount')}</th>
+                    <th style={{ width: '20%', textAlign: 'center' }}>{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -628,10 +628,24 @@ export default function PribadiPage() {
                       }}>
                         {item.type === 'income' ? '+' : '-'}{formatRupiah(item.amount)}
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                          <button className="btn-icon" onClick={() => openEditTx(item)} title="Edit"><Edit2 size={14} /></button>
-                          <button className="btn-icon" onClick={() => setDeleteItem(item)} title="Hapus" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
+                      <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' }}>
+                          <button
+                            className="btn-icon"
+                            onClick={() => openEditTx(item)}
+                            title="Edit"
+                            style={{ flexShrink: 0, minWidth: 30, minHeight: 30 }}
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            className="btn-icon"
+                            onClick={() => setDeleteItem(item)}
+                            title="Hapus"
+                            style={{ color: '#ef4444', flexShrink: 0, minWidth: 30, minHeight: 30 }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </td>
                     </tr>
