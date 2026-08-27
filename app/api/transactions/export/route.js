@@ -35,7 +35,7 @@ export async function GET(request) {
     const transactions = await prisma.transaction.findMany({
       where,
       include: { member: { select: { name: true } } },
-      orderBy: { transactionDate: 'desc' },
+      orderBy: [{ transactionDate: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
     })
 
     // Build CSV

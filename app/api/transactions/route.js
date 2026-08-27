@@ -53,13 +53,36 @@ export async function GET(request) {
 
     const skip = (page - 1) * limit
 
+    // Deterministic sorting: selalu gunakan createdAt dan id sebagai tie-breaker
+    // agar transaksi di tanggal yang sama tidak tertukar/terlewat saat pagination
+    let orderClause = []
+    if (sortBy === 'transactionDate') {
+      orderClause = [
+        { transactionDate: sortOrder },
+        { createdAt: sortOrder },
+        { id: 'desc' },
+      ]
+    } else if (sortBy === 'createdAt') {
+      orderClause = [
+        { createdAt: sortOrder },
+        { id: 'desc' },
+      ]
+    } else {
+      orderClause = [
+        { [sortBy]: sortOrder },
+        { transactionDate: 'desc' },
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ]
+    }
+
     const [transactions, total] = await Promise.all([
       prisma.transaction.findMany({
         where,
         include: {
           member: { select: { id: true, name: true, avatarColor: true } },
         },
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: orderClause,
         skip,
         take: limit,
       }),
