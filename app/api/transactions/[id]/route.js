@@ -99,7 +99,34 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Transaksi tidak ditemukan' }, { status: 404 })
     }
 
+    // Hapus transaksi dari database
     await prisma.transaction.delete({ where: { id } })
+
+    // ─────────────────────────────────────────────────────────────────
+    // PERBAIKAN BUG: Jika yang dihapus adalah transaksi "Tambah Kas
+    // (Top-up)", maka budget bulanan harus dikurangi kembali agar
+    // saldo tetap sinkron dengan uang yang nyatanya dipegang.
+    // ─────────────────────────────────────────────────────────────────
+    if (
+      transaction.category === 'pemasukan' &&
+      transaction.itemName === 'Tambah Kas (Top-up)'
+    ) {
+      const txDate = new Date(transaction.transactionDate)
+      const txMonth = txDate.getMonth() + 1
+      const txYear = txDate.getFullYear()
+
+      const existingBudget = await prisma.monthlyBudget.findUnique({
+        where: { uq_month_year: { month: txMonth, year: txYear } },
+      })
+
+      if (existingBudget) {
+        const newAmount = Number(existingBudget.amount) - Number(transaction.amount)
+        await prisma.monthlyBudget.update({
+          where: { uq_month_year: { month: txMonth, year: txYear } },
+          data: { amount: BigInt(Math.max(0, newAmount)) },
+        })
+      }
+    }
 
     // Catat log aktivitas hapus
     await logActivity({
@@ -122,3 +149,4 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
   }
 }
+
