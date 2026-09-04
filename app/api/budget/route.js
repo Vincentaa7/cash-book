@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { logActivity } from '@/lib/logger'
+import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
 import { formatRupiah } from '@/lib/format'
 
 export async function GET(request) {
@@ -97,11 +97,15 @@ export async function POST(request) {
         }
       })
 
+      // Hitung sisa saldo setelah kas ditambah
+      const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear)
+      const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+
       // Catat log aktivitas tambah kas
       await logActivity({
         action: 'BUDGET_UPDATE',
-        description: `${session.name} menambah kas bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}`,
-        details: { month: parsedMonth, year: parsedYear, amount, action, total: Number(budget.amount) },
+        description: `${session.name} menambah kas bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}${balanceText}`,
+        details: { month: parsedMonth, year: parsedYear, amount, action, total: Number(budget.amount), remainingBalance },
         memberId: session.id,
       })
     } else {
@@ -120,11 +124,15 @@ export async function POST(request) {
         },
       })
 
+      // Hitung sisa saldo setelah kas utama diatur
+      const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear)
+      const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+
       // Catat log aktivitas set kas utama
       await logActivity({
         action: 'BUDGET_UPDATE',
-        description: `${session.name} menetapkan kas utama bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}`,
-        details: { month: parsedMonth, year: parsedYear, amount, action },
+        description: `${session.name} menetapkan kas utama bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}${balanceText}`,
+        details: { month: parsedMonth, year: parsedYear, amount, action, remainingBalance },
         memberId: session.id,
       })
     }

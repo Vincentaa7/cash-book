@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { logActivity } from '@/lib/logger'
+import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
 import { formatRupiah } from '@/lib/format'
 
 export async function PUT(request, { params }) {
@@ -50,10 +50,17 @@ export async function PUT(request, { params }) {
       },
     })
 
+    // Hitung sisa saldo setelah transaksi diubah
+    const txDate = new Date(transactionDate)
+    const txMonth = txDate.getUTCMonth() + 1
+    const txYear = txDate.getUTCFullYear()
+    const remainingBalance = await getMonthRemainingBalance(txMonth, txYear)
+    const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+
     // Catat log aktivitas edit
     await logActivity({
       action: 'TRANSACTION_UPDATE',
-      description: `${session.name} mengubah transaksi "${transaction.itemName}" (${formatRupiah(transaction.amount)}) menjadi "${itemName}" (${formatRupiah(amount)})`,
+      description: `${session.name} mengubah transaksi "${transaction.itemName}" (${formatRupiah(transaction.amount)}) menjadi "${itemName}" (${formatRupiah(amount)})${balanceText}`,
       details: {
         id,
         old: {
@@ -70,6 +77,7 @@ export async function PUT(request, { params }) {
           transactionDate,
           notes,
         },
+        remainingBalance,
       },
       memberId: session.id,
     })
@@ -128,10 +136,17 @@ export async function DELETE(request, { params }) {
       }
     }
 
+    // Hitung sisa saldo setelah transaksi dihapus
+    const delDate = new Date(transaction.transactionDate)
+    const delMonth = delDate.getUTCMonth() + 1
+    const delYear = delDate.getUTCFullYear()
+    const remainingBalance = await getMonthRemainingBalance(delMonth, delYear)
+    const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+
     // Catat log aktivitas hapus
     await logActivity({
       action: 'TRANSACTION_DELETE',
-      description: `${session.name} menghapus transaksi "${transaction.itemName}" sebesar ${formatRupiah(transaction.amount)}`,
+      description: `${session.name} menghapus transaksi "${transaction.itemName}" sebesar ${formatRupiah(transaction.amount)}${balanceText}`,
       details: {
         id,
         itemName: transaction.itemName,
@@ -139,6 +154,7 @@ export async function DELETE(request, { params }) {
         category: transaction.category,
         transactionDate: transaction.transactionDate.toISOString().split('T')[0],
         notes: transaction.notes,
+        remainingBalance,
       },
       memberId: session.id,
     })

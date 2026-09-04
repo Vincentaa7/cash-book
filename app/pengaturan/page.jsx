@@ -147,7 +147,7 @@ function PengaturanContent() {
   async function handleSaveBudget(e) {
     e.preventDefault()
     if (!budgetAmount || Number(budgetAmount) <= 0) {
-      showMessage('error', 'Jumlah kas harus lebih dari 0')
+      showMessage('error', t('budget_must_be_positive'))
       return
     }
 
@@ -181,7 +181,7 @@ function PengaturanContent() {
   async function handleAddBudget(e) {
     e.preventDefault()
     if (!addAmount || Number(addAmount) <= 0) {
-      showMessage('error', 'Jumlah tambahan harus lebih dari 0')
+      showMessage('error', t('add_amount_must_be_positive'))
       return
     }
 
@@ -287,7 +287,7 @@ function PengaturanContent() {
   // --- App Settings Handlers ---
   async function handleSaveSettings(e) {
     e.preventDefault()
-    if (!formFamilyName.trim()) return showMessage('error', 'Nama keluarga wajib diisi')
+    if (!formFamilyName.trim()) return showMessage('error', t('family_name_required'))
 
     setLoading(true)
     try {
@@ -745,7 +745,7 @@ function PengaturanContent() {
                     </div>
                   ) : activityLogs.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
-                      Belum ada aktivitas tercatat.
+                      {t('no_activity_logs')}
                     </div>
                   ) : (
                     <>

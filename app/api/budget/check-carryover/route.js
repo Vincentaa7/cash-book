@@ -29,15 +29,18 @@ export async function GET() {
       prevYear -= 1
     }
 
-    const firstDayPrev = new Date(prevYear, prevMonth - 1, 1)
-    const lastDayPrev = new Date(prevYear, prevMonth, 0)
+    const firstDayPrev = new Date(Date.UTC(prevYear, prevMonth - 1, 1))
+    const lastDayPrev = new Date(Date.UTC(prevYear, prevMonth, 0, 23, 59, 59, 999))
 
     const [budgetPrev, expensePrev] = await Promise.all([
       prisma.monthlyBudget.findUnique({
         where: { uq_month_year: { month: prevMonth, year: prevYear } },
       }),
       prisma.transaction.aggregate({
-        where: { transactionDate: { gte: firstDayPrev, lte: lastDayPrev } },
+        where: {
+          transactionDate: { gte: firstDayPrev, lte: lastDayPrev },
+          category: { not: 'pemasukan' },
+        },
         _sum: { amount: true },
       }),
     ])

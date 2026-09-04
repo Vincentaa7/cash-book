@@ -23,13 +23,17 @@ export async function GET(request) {
       const m = parseInt(month)
       const y = parseInt(year)
       where.transactionDate = {
-        gte: new Date(y, m - 1, 1),
-        lte: new Date(y, m, 0),
+        gte: new Date(Date.UTC(y, m - 1, 1)),
+        lte: new Date(Date.UTC(y, m, 0, 23, 59, 59, 999)),
       }
     } else if (startDate || endDate) {
       where.transactionDate = {}
       if (startDate) where.transactionDate.gte = new Date(startDate)
-      if (endDate) where.transactionDate.lte = new Date(endDate)
+      if (endDate) {
+        const end = new Date(endDate)
+        end.setUTCHours(23, 59, 59, 999)
+        where.transactionDate.lte = end
+      }
     }
 
     const transactions = await prisma.transaction.findMany({

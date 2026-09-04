@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
+import { formatRupiah } from '@/lib/format'
 
 export async function POST(request) {
   try {
@@ -25,6 +27,12 @@ export async function POST(request) {
         prisma.appSettings.update({
           where: { id: '1' },
           data: { lastCarryOverMonth: currentMonthStr },
+        }),
+        logActivity({
+          action: 'BUDGET_UPDATE',
+          description: `${session.name} menolak pemindahan sisa kas bulan lalu (Mulai dari Nol untuk ${month}/${year})`,
+          details: { month, year, action: 'reject' },
+          memberId: session.id,
         })
       ])
       return NextResponse.json({ success: true, message: 'Rejected/Fresh-Start' })
@@ -56,6 +64,17 @@ export async function POST(request) {
     await prisma.appSettings.update({
       where: { id: '1' },
       data: { lastCarryOverMonth: currentMonthStr },
+    })
+
+    // 3. Catat log aktivitas pindah saldo
+    const remainingBalance = await getMonthRemainingBalance(month, year)
+    const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+
+    await logActivity({
+      action: 'BUDGET_UPDATE',
+      description: `${session.name} memindahkan sisa kas bulan lalu sebesar ${formatRupiah(amount)} ke kas bulan ${month}/${year}${balanceText}`,
+      details: { month, year, amount, action: 'agree', totalBudget: newAmount, remainingBalance },
+      memberId: session.id,
     })
 
     return NextResponse.json({ success: true, newAmount })

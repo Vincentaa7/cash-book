@@ -17,9 +17,9 @@ export async function GET(request) {
     const year = parseInt(searchParams.get('year')) || now.getFullYear()
     const summaryOnly = searchParams.get('summaryOnly') === 'true'
 
-    // Tanggal awal dan akhir bulan
-    const firstDay = new Date(year, month - 1, 1)
-    const lastDay = new Date(year, month, 0)
+    // Tanggal awal dan akhir bulan (UTC bounds agar mencakup hari ke-31 di semua zona waktu)
+    const firstDay = new Date(Date.UTC(year, month - 1, 1))
+    const lastDay = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
 
     if (summaryOnly) {
       const [budget, transactions] = await Promise.all([
@@ -138,8 +138,8 @@ export async function GET(request) {
     // Eksekusi semua query secara paralel menggunakan Promise.all
     const monthlyTrends = await Promise.all(
       monthsToQuery.map(async ({ m, y }) => {
-        const mFirstDay = new Date(y, m - 1, 1)
-        const mLastDay = new Date(y, m, 0)
+        const mFirstDay = new Date(Date.UTC(y, m - 1, 1))
+        const mLastDay = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999))
         let expenseAmount = 0
 
         // Cek apakah bulan ini sudah melewati cutoff (data mungkin sudah diarsip)

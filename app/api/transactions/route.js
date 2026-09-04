@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { logActivity } from '@/lib/logger'
+import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
 import { formatRupiah } from '@/lib/format'
 
 export async function GET(request) {
@@ -42,13 +42,17 @@ export async function GET(request) {
       // Filter bulan tertentu
       const m = parseInt(month)
       const y = parseInt(year)
-      const firstDay = new Date(y, m - 1, 1)
-      const lastDay = new Date(y, m, 0)
+      const firstDay = new Date(Date.UTC(y, m - 1, 1))
+      const lastDay = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999))
       where.transactionDate = { gte: firstDay, lte: lastDay }
     } else if (startDate || endDate) {
       where.transactionDate = {}
       if (startDate) where.transactionDate.gte = new Date(startDate)
-      if (endDate) where.transactionDate.lte = new Date(endDate)
+      if (endDate) {
+        const end = new Date(endDate)
+        end.setUTCHours(23, 59, 59, 999)
+        where.transactionDate.lte = end
+      }
     }
 
     const skip = (page - 1) * limit
@@ -135,10 +139,17 @@ export async function POST(request) {
       },
     })
 
+    // Hitung sisa saldo setelah transaksi dicatat
+    const txDate = new Date(transactionDate)
+    const txMonth = txDate.getUTCMonth() + 1
+    const txYear = txDate.getUTCFullYear()
+    const remainingBalance = await getMonthRemainingBalance(txMonth, txYear)
+    const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+
     // Catat log aktivitas
     await logActivity({
       action: 'TRANSACTION_CREATE',
-      description: `${session.name} mencatat transaksi "${itemName}" sebesar ${formatRupiah(amount)}`,
+      description: `${session.name} mencatat transaksi "${itemName}" sebesar ${formatRupiah(amount)}${balanceText}`,
       details: {
         id: transaction.id,
         itemName,
@@ -146,6 +157,7 @@ export async function POST(request) {
         category,
         transactionDate,
         notes,
+        remainingBalance,
       },
       memberId: session.id,
     })

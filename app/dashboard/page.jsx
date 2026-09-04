@@ -129,7 +129,7 @@ export default function DashboardPage() {
               <div className="alert alert-danger" style={{ marginBottom: 24 }}>
                 <AlertTriangle size={16} />
                 <span>
-                  ⚠️ Sisa kas sudah habis atau minus! Total pengeluaran melebihi kas yang ditetapkan.
+                  {t('budget_depleted_alert')}
                 </span>
               </div>
             )}

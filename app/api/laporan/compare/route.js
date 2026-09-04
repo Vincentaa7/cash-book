@@ -4,14 +4,14 @@ import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
 
 async function getMonthExpense(month, year, cutoffDate) {
-  const firstDay = new Date(year, month - 1, 1)
-  const lastDay = new Date(year, month, 0)
+  const firstDay = new Date(Date.UTC(year, month - 1, 1))
+  const lastDay = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
 
   let expenseAmount = 0
   if (lastDay < cutoffDate) {
     // Ambil dari monthly_snapshots
     const snapshotAgg = await prisma.monthlySnapshot.aggregate({
-      where: { month, year },
+      where: { month, year, category: { not: 'pemasukan' } },
       _sum: { totalAmount: true },
     })
     expenseAmount = Number(snapshotAgg._sum.totalAmount || 0)
@@ -19,7 +19,10 @@ async function getMonthExpense(month, year, cutoffDate) {
     // Jika snapshot kosong, coba fallback ke transactions
     if (expenseAmount === 0) {
       const txAgg = await prisma.transaction.aggregate({
-        where: { transactionDate: { gte: firstDay, lte: lastDay } },
+        where: {
+          transactionDate: { gte: firstDay, lte: lastDay },
+          category: { not: 'pemasukan' }
+        },
         _sum: { amount: true },
       })
       expenseAmount = Number(txAgg._sum.amount || 0)
@@ -27,7 +30,10 @@ async function getMonthExpense(month, year, cutoffDate) {
   } else {
     // Bulan masih dalam range 90 hari, ambil dari transactions
     const txAgg = await prisma.transaction.aggregate({
-      where: { transactionDate: { gte: firstDay, lte: lastDay } },
+      where: {
+        transactionDate: { gte: firstDay, lte: lastDay },
+        category: { not: 'pemasukan' }
+      },
       _sum: { amount: true },
     })
     expenseAmount = Number(txAgg._sum.amount || 0)

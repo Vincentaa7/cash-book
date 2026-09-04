@@ -14,12 +14,19 @@ export const useLanguage = () => {
 }
 
 export function LanguageProvider({ children }) {
-  const [language, setLanguage] = useState('id')
+  const [language, setLanguage] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('cb-lang') || 'id'
+    }
+    return 'id'
+  })
 
   useEffect(() => {
     const savedLang = localStorage.getItem('cb-lang') || 'id'
-    setLanguage(savedLang)
-  }, [])
+    if (savedLang !== language) {
+      setLanguage(savedLang)
+    }
+  }, [language])
 
   const t = (key) => {
     return translations[language]?.[key] || key
