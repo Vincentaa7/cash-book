@@ -25,6 +25,14 @@ export async function PUT(request, { params }) {
 
     const { name, pin, role, avatarColor, isActive } = await request.json()
 
+    // Perlindungan RBAC: Cegah eskalasi hak akses (Privilege Escalation)
+    if (existingMember.role === 'superadmin' && session.role !== 'superadmin') {
+      return NextResponse.json({ error: 'Hanya Super Admin yang dapat mengubah profil Super Admin' }, { status: 403 })
+    }
+    if (role === 'superadmin' && session.role !== 'superadmin') {
+      return NextResponse.json({ error: 'Hanya Super Admin yang dapat memberikan hak akses Super Admin' }, { status: 403 })
+    }
+
     const updateData = {}
     if (name !== undefined) updateData.name = name
     if (role !== undefined) updateData.role = role
@@ -88,14 +96,19 @@ export async function DELETE(request, { params }) {
 
     const existingMember = await prisma.member.findUnique({
       where: { id },
-      select: { id: true, name: true },
+      select: { id: true, name: true, role: true },
     })
 
     if (!existingMember) {
       return NextResponse.json({ error: 'Anggota tidak ditemukan' }, { status: 404 })
     }
 
-    // Jangan hapus admin terakhir
+    // Perlindungan RBAC: Akun superadmin tidak boleh dinonaktifkan
+    if (existingMember.role === 'superadmin') {
+      return NextResponse.json({ error: 'Akun Super Admin terlindungi dan tidak dapat dinonaktifkan' }, { status: 403 })
+    }
+
+    // Jangan nonaktifkan akun sendiri
     if (session.id === id) {
       return NextResponse.json({ error: 'Tidak bisa menonaktifkan akun sendiri' }, { status: 400 })
     }

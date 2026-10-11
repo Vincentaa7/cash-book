@@ -1,7 +1,7 @@
-// app/api/ai-chat/route.js - API endpoint untuk AI Financial Assistant menggunakan Groq Cloud
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 
 export async function POST(request) {
   try {
@@ -9,6 +9,16 @@ export async function POST(request) {
     const session = await getSession()
     if (!session) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
+    }
+
+    // Rate limiting: Max 12 pesan per menit per user untuk mencegah DoS query & kuota AI
+    const rateCheck = checkRateLimit(`ai-chat:${session.id}`, 12, 60000)
+    if (!rateCheck.success) {
+      const waitSec = Math.max(1, Math.ceil((rateCheck.resetTime - Date.now()) / 1000))
+      return NextResponse.json(
+        { error: `Terlalu banyak permintaan ke asisten AI. Harap tunggu ${waitSec} detik.` },
+        { status: 429, headers: { 'Retry-After': String(waitSec) } }
+      )
     }
 
     // 2. Cek API Key Groq

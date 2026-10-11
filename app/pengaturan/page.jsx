@@ -361,44 +361,44 @@ function PengaturanContent() {
         <div className="settings-container">
           {/* Tabs Sidebar */}
           <div className="card settings-tabs-sidebar">
-            <div className="card-body" style={{ padding: '16px 0' }}>
-              <div 
-                className={`nav-link ${activeTab === 'budget' ? 'active' : ''}`}
+            <div className="card-body settings-tabs-body">
+              <button 
+                type="button"
+                className={`settings-tab-btn ${activeTab === 'budget' ? 'active' : ''}`}
                 onClick={() => setActiveTab('budget')}
-                style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'budget' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
               >
                 <Wallet size={18} /> {t('budget_settings')}
-              </div>
-              <div 
-                className={`nav-link ${activeTab === 'members' ? 'active' : ''}`}
+              </button>
+              <button 
+                type="button"
+                className={`settings-tab-btn ${activeTab === 'members' ? 'active' : ''}`}
                 onClick={() => setActiveTab('members')}
-                style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'members' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
               >
                 <Users size={18} /> {t('family_members')}
-              </div>
-              <div 
-                className={`nav-link ${activeTab === 'app' ? 'active' : ''}`}
+              </button>
+              <button 
+                type="button"
+                className={`settings-tab-btn ${activeTab === 'app' ? 'active' : ''}`}
                 onClick={() => setActiveTab('app')}
-                style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'app' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
               >
                 <Settings size={18} /> {t('app_preferences')}
-              </div>
+              </button>
               {user?.role === 'superadmin' && (
                 <>
-                  <div 
-                    className={`nav-link ${activeTab === 'database' ? 'active' : ''}`}
+                  <button 
+                    type="button"
+                    className={`settings-tab-btn ${activeTab === 'database' ? 'active' : ''}`}
                     onClick={() => { setActiveTab('database'); fetchDbPreview() }}
-                    style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'database' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
                   >
                     <Database size={18} /> Database
-                  </div>
-                  <div 
-                    className={`nav-link ${activeTab === 'activityLog' ? 'active' : ''}`}
+                  </button>
+                  <button 
+                    type="button"
+                    className={`settings-tab-btn ${activeTab === 'activityLog' ? 'active' : ''}`}
                     onClick={() => { setActiveTab('activityLog'); fetchActivityLogs(1) }}
-                    style={{ padding: '12px 24px', borderRadius: 0, borderLeft: activeTab === 'activityLog' ? '3px solid var(--color-primary-600)' : '3px solid transparent' }}
                   >
                     <ClipboardList size={18} /> {t('db_log')}
-                  </div>
+                  </button>
                 </>
               )}
             </div>
@@ -456,19 +456,19 @@ function PengaturanContent() {
 
                   {/* Add Cash (Top-up) - Only visible if budget exists */}
                   {initialBudget > 0 && (
-                    <div style={{ padding: 20, background: 'var(--bg-tertiary)', borderRadius: 16, border: '1px dashed var(--border-color)', transition: 'background-color 0.3s ease, border-color 0.3s ease' }}>
-                      <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 16, border: '1px dashed var(--border-color)', width: '100%', boxSizing: 'border-box', transition: 'background-color 0.3s ease, border-color 0.3s ease' }}>
+                      <h4 style={{ margin: '0 0 14px 0', fontSize: '1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
                          <PlusCircle size={18} color="#10b981" /> {t('add_cash')}
                       </h4>
-                      <form onSubmit={handleAddBudget} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                        <div className="form-group" style={{ margin: 0, flex: 2, minWidth: 200 }}>
-                          <div style={{ position: 'relative' }}>
+                      <form onSubmit={handleAddBudget} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: '100%' }}>
+                        <div className="form-group" style={{ margin: 0, flex: '1 1 180px', minWidth: 0, width: '100%' }}>
+                          <div style={{ position: 'relative', width: '100%' }}>
                             <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontWeight: 600 }}>Rp</div>
                             <input
                               type="text"
                               inputMode="numeric"
                               className="form-input"
-                              style={{ paddingLeft: 40 }}
+                              style={{ paddingLeft: 40, width: '100%', boxSizing: 'border-box' }}
                               placeholder="0"
                               value={addAmount ? formatNumber(parseInt(addAmount)) : ''}
                               onChange={e => {
@@ -478,7 +478,7 @@ function PengaturanContent() {
                             />
                           </div>
                         </div>
-                        <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={loading}>
+                        <button type="submit" className="btn btn-primary" style={{ flex: '1 1 130px', minHeight: 42 }} disabled={loading}>
                           {loading ? t('loading') : `+ ${t('add_cash')}`}
                         </button>
                       </form>
@@ -671,7 +671,7 @@ function PengaturanContent() {
 
                   {!dbLoading && dbPreview && (
                     <div style={{ marginBottom: 24 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
                         <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: '14px 18px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
                           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-primary-600)' }}>{dbPreview.totalInDb ?? '-'}</div>
                           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>{t('db_total_in_db')}</div>
@@ -729,7 +729,7 @@ function PengaturanContent() {
                         <Check size={16} />
                         <span>{cleanupDone.message}</span>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
                         <div style={{ background: '#dcfce7', borderRadius: 10, padding: '14px 18px', textAlign: 'center' }}>
                           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#16a34a' }}>{cleanupDone.archived}</div>
                           <div style={{ fontSize: '0.8rem', color: '#166534', marginTop: 4 }}>{t('db_archived_count')}</div>

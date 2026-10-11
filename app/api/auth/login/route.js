@@ -4,9 +4,28 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import prisma from '@/lib/db'
 import { signToken, createSessionCookie } from '@/lib/auth'
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
 
 export async function POST(request) {
   try {
+    const clientIp = getClientIp(request)
+    // Proteksi brute force & bcrypt CPU exhaustion: Max 5 percobaan login per menit per IP
+    const rateCheck = checkRateLimit(`login:${clientIp}`, 5, 60000)
+    if (!rateCheck.success) {
+      const waitSec = Math.max(1, Math.ceil((rateCheck.resetTime - Date.now()) / 1000))
+      return NextResponse.json(
+        { error: `Terlalu banyak percobaan login. Harap tunggu ${waitSec} detik demi keamanan.` },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(waitSec),
+            'X-RateLimit-Limit': String(rateCheck.total),
+            'X-RateLimit-Remaining': '0',
+          }
+        }
+      )
+    }
+
     let body;
     try {
       body = await request.json()
