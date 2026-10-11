@@ -25,13 +25,15 @@ export default function CarryOverModal({ amount, prevMonth, prevYear, onComplete
 
     setLoading(true)
     try {
+      const targetMonth = prevMonth === 12 ? 1 : prevMonth + 1
+      const targetYear = prevMonth === 12 ? prevYear + 1 : prevYear
       const res = await fetch('/api/budget/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, action })
+        body: JSON.stringify({ amount, action, month: targetMonth, year: targetYear })
       })
-      if (res.ok) {
-        onComplete(true) // Diproses (setuju atau tolak permanen)
+      if (res.ok || res.status === 409) {
+        onComplete(true) // Diproses (setuju/tolak) atau kas bulan ini ternyata sudah diatur
       }
     } catch (e) {
       console.error(e)

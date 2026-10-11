@@ -1,14 +1,55 @@
 // public/sw.js — Service Worker for Cash Book Daily Reminder
 // Handles scheduling of daily push notifications via the browser's Notification API
 
-const SW_VERSION = 'cashbook-sw-v1'
+const SW_VERSION = 'cashbook-sw-v2'
+const CACHE_NAME = 'cashbook-static-v2'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      )
+    }).then(() => self.clients.claim())
+  )
+})
+
+// Fetch event handler required for PWA installability in Chromium browsers
+self.addEventListener('fetch', (event) => {
+  // Hanya tangani GET requests
+  if (event.request.method !== 'GET') return
+
+  // Lewati API routes agar selalu fresh data
+  if (event.request.url.includes('/api/')) {
+    return
+  }
+
+  event.respondWith(
+    fetch(event.request)
+      .then((networkResponse) => {
+        // Cache static files (images, icons, fonts)
+        if (
+          networkResponse &&
+          networkResponse.status === 200 &&
+          (event.request.url.match(/\.(png|jpg|jpeg|svg|ico|woff2?|css|js)$/) ||
+           event.request.url.includes('/manifest.json'))
+        ) {
+          const responseClone = networkResponse.clone()
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone)
+          })
+        }
+        return networkResponse
+      })
+      .catch(() => {
+        // Fallback ke cache jika offline
+        return caches.match(event.request)
+      })
+  )
 })
 
 // Handle messages from the main page

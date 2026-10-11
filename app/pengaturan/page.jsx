@@ -129,6 +129,36 @@ function PengaturanContent() {
     setLogsLoading(false)
   }
 
+  function renderLogDescription(desc) {
+    if (!desc) return null
+    const match = desc.match(/^(.*?)\s*\((Sisa Saldo:.*?)\)$/i)
+    if (match) {
+      return (
+        <div className="activity-log-desc-group">
+          <span className="activity-log-desc-main">{match[1]}</span>
+          <span className="badge badge-teal activity-log-balance-pill">{match[2]}</span>
+        </div>
+      )
+    }
+    return <span className="activity-log-desc-main">{desc}</span>
+  }
+
+  function getLogPageNumbers() {
+    if (logsTotalPages <= 5) {
+      return Array.from({ length: logsTotalPages }, (_, idx) => idx + 1)
+    }
+    const pages = [1]
+    if (logsPage > 3) pages.push('...')
+    const start = Math.max(2, logsPage - 1)
+    const end = Math.min(logsTotalPages - 1, logsPage + 1)
+    for (let i = start; i <= end; i++) {
+      pages.push(i)
+    }
+    if (logsPage < logsTotalPages - 2) pages.push('...')
+    pages.push(logsTotalPages)
+    return pages
+  }
+
   function showMessage(type, text) {
     if (type === 'success') {
       setSuccessMsg(text)
@@ -328,9 +358,9 @@ function PengaturanContent() {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div className="settings-container">
           {/* Tabs Sidebar */}
-          <div className="card" style={{ flex: '1', minWidth: 250, alignSelf: 'stretch' }}>
+          <div className="card settings-tabs-sidebar">
             <div className="card-body" style={{ padding: '16px 0' }}>
               <div 
                 className={`nav-link ${activeTab === 'budget' ? 'active' : ''}`}
@@ -375,7 +405,7 @@ function PengaturanContent() {
           </div>
 
           {/* Tab Content */}
-          <div style={{ flex: '3', minWidth: 300 }}>
+          <div className="settings-content">
             {activeTab === 'budget' && (
               <div className="card fade-in-up">
                 <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -749,19 +779,20 @@ function PengaturanContent() {
                     </div>
                   ) : (
                     <>
-                      <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
-                        <table className="table">
+                      {/* Desktop Table View */}
+                      <div className="activity-log-table-wrapper table-container" style={{ border: 'none', borderRadius: 0 }}>
+                        <table className="table activity-log-table">
                           <thead>
                             <tr>
-                              <th style={{ width: '25%' }}>{t('db_log_actor')}</th>
-                              <th style={{ width: '50%' }}>{t('db_log_action')}</th>
+                              <th style={{ width: '22%' }}>{t('db_log_actor')}</th>
+                              <th style={{ width: '53%' }}>{t('db_log_action')}</th>
                               <th style={{ width: '25%' }}>{t('date')}</th>
                             </tr>
                           </thead>
                           <tbody>
                             {activityLogs.map(log => (
                               <tr key={log.id}>
-                                <td style={{ maxWidth: 120 }}>
+                                <td style={{ maxWidth: 140 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                                     <div style={{
                                       width: 28,
@@ -789,8 +820,8 @@ function PengaturanContent() {
                                     }}>{log.member?.name || 'Sistem'}</span>
                                   </div>
                                 </td>
-                                <td style={{ fontSize: '0.85rem', lineHeight: 1.4 }}>
-                                  {log.description}
+                                <td>
+                                  {renderLogDescription(log.description)}
                                 </td>
                                 <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                                   {formatDate(log.createdAt, language)} {formatTime(log.createdAt, language)}
@@ -801,9 +832,36 @@ function PengaturanContent() {
                         </table>
                       </div>
 
-                      {/* Pagination for Logs */}
+                      {/* Mobile Responsive Cards View */}
+                      <div className="activity-log-cards-wrapper">
+                        {activityLogs.map(log => (
+                          <div key={log.id} className="activity-log-card">
+                            <div className="activity-log-card-header">
+                              <div className="activity-log-actor">
+                                <div
+                                  className="activity-log-avatar"
+                                  style={{ background: log.member?.avatarColor || '#0d9488' }}
+                                >
+                                  {log.member?.name?.substring(0, 2).toUpperCase() || 'S'}
+                                </div>
+                                <span className="activity-log-actor-name">
+                                  {log.member?.name || 'Sistem'}
+                                </span>
+                              </div>
+                              <div className="activity-log-card-time">
+                                {formatDate(log.createdAt, language)} {formatTime(log.createdAt, language)}
+                              </div>
+                            </div>
+                            <div className="activity-log-card-body">
+                              {renderLogDescription(log.description)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Responsive Pagination for Logs */}
                       {logsTotalPages > 1 && (
-                        <div className="pagination" style={{ marginTop: 20 }}>
+                        <div className="pagination activity-log-pagination" style={{ marginTop: 20 }}>
                           <span className="pagination-info">
                             Hal {logsPage} / {logsTotalPages} ({logsTotal} log)
                           </span>
@@ -812,22 +870,30 @@ function PengaturanContent() {
                               className="pagination-btn"
                               onClick={() => fetchActivityLogs(logsPage - 1)}
                               disabled={logsPage === 1}
+                              aria-label="Previous page"
                             >
                               ‹
                             </button>
-                            {Array.from({ length: logsTotalPages }, (_, idx) => (
-                              <button
-                                key={idx + 1}
-                                className={`pagination-btn ${logsPage === idx + 1 ? 'active' : ''}`}
-                                onClick={() => fetchActivityLogs(idx + 1)}
-                              >
-                                {idx + 1}
-                              </button>
-                            ))}
+                            {getLogPageNumbers().map((p, idx) =>
+                              p === '...' ? (
+                                <span key={`dots-${idx}`} className="pagination-ellipsis" style={{ padding: '0 4px', alignSelf: 'center', color: 'var(--text-muted)' }}>
+                                  …
+                                </span>
+                              ) : (
+                                <button
+                                  key={p}
+                                  className={`pagination-btn ${logsPage === p ? 'active' : ''}`}
+                                  onClick={() => fetchActivityLogs(p)}
+                                >
+                                  {p}
+                                </button>
+                              )
+                            )}
                             <button
                               className="pagination-btn"
                               onClick={() => fetchActivityLogs(logsPage + 1)}
                               disabled={logsPage === logsTotalPages}
+                              aria-label="Next page"
                             >
                               ›
                             </button>

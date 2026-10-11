@@ -29,6 +29,7 @@ export const viewport = {
 
 import { LanguageProvider } from '@/components/LanguageContext'
 import { UserProvider } from '@/components/UserContext'
+import PwaRegister from '@/components/PwaRegister'
 
 export default function RootLayout({ children }) {
   return (
@@ -36,7 +37,7 @@ export default function RootLayout({ children }) {
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/favicon.ico" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="application-name" content="Cash Book" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -46,6 +47,7 @@ export default function RootLayout({ children }) {
         <LanguageProvider>
           <UserProvider>
             {children}
+            <PwaRegister />
           </UserProvider>
         </LanguageProvider>
       </body>

@@ -4,6 +4,7 @@ import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
 import { formatRupiah } from '@/lib/format'
+import { getAppToday } from '@/lib/cashbook'
 
 export async function POST(request) {
   try {
@@ -12,72 +13,86 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { amount, action } = await request.json()
-    const now = new Date()
-    const month = now.getMonth() + 1
-    const year = now.getFullYear()
+    const { action, month: bodyMonth, year: bodyYear } = await request.json()
+    // Prioritaskan waktu lokal pengguna dari peramban, fallback ke WITA
+    const today = getAppToday()
+    const month = (bodyMonth >= 1 && bodyMonth <= 12) ? bodyMonth : today.month
+    const year = (bodyYear >= 2020 && bodyYear <= 2100) ? bodyYear : today.year
     const currentMonthStr = `${year}-${String(month).padStart(2, '0')}`
 
+    const existingBudget = await prisma.monthlyBudget.findUnique({
+      where: { uq_month_year: { month, year } },
+    })
+
     if (action === 'reject') {
-      // 'Fresh Start': Hapus record kas bulan ini (jika ada) agar admin harus mengeset ulang
+      // Tolak pindahan: HANYA tandai sudah diproses.
+      // Kas bulan ini yang sudah ada TIDAK lagi dihapus (dulu bisa menghapus
+      // kas yang baru saja diatur admin).
       await Promise.all([
-        prisma.monthlyBudget.deleteMany({
-          where: { month, year }
-        }),
         prisma.appSettings.update({
           where: { id: '1' },
           data: { lastCarryOverMonth: currentMonthStr },
         }),
         logActivity({
           action: 'BUDGET_UPDATE',
-          description: `${session.name} menolak pemindahan sisa kas bulan lalu (Mulai dari Nol untuk ${month}/${year})`,
-          details: { month, year, action: 'reject' },
+          description: `${session.name} menolak pemindahan sisa kas bulan lalu ke ${month}/${year}`,
+          details: { month, year, action: 'reject', existingBudget: existingBudget ? Number(existingBudget.amount) : null },
           memberId: session.id,
         })
       ])
-      return NextResponse.json({ success: true, message: 'Rejected/Fresh-Start' })
+      return NextResponse.json({ success: true, message: 'Rejected' })
     }
 
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
+    // Cegah saldo ganda: jika kas bulan ini sudah ada (sudah dipindah / diatur manual)
+    if (existingBudget) {
+      await prisma.appSettings.update({
+        where: { id: '1' },
+        data: { lastCarryOverMonth: currentMonthStr },
+      })
+      return NextResponse.json(
+        { error: 'Kas bulan ini sudah diatur. Pindahan saldo dibatalkan agar tidak ganda.' },
+        { status: 409 }
+      )
     }
 
-    // 1. Update/Upsert Budget Bulan Ini
-    const budget = await prisma.monthlyBudget.findUnique({
-      where: { uq_month_year: { month, year } },
-    })
+    // Hitung ulang sisa saldo bulan lalu di server (tidak percaya nominal dari browser,
+    // karena bisa sudah berubah sejak popup muncul)
+    let prevMonth = month - 1
+    let prevYear = year
+    if (prevMonth === 0) { prevMonth = 12; prevYear -= 1 }
+    const amount = await getMonthRemainingBalance(prevMonth, prevYear)
 
-    const newAmount = (budget ? Number(budget.amount) : 0) + Number(amount)
+    if (amount === null || amount <= 0) {
+      return NextResponse.json({ error: 'Tidak ada sisa saldo bulan lalu untuk dipindahkan' }, { status: 400 })
+    }
 
-    await prisma.monthlyBudget.upsert({
-      where: { uq_month_year: { month, year } },
-      update: { amount: BigInt(newAmount) },
-      create: { 
-        month, 
-        year, 
-        amount: BigInt(newAmount), 
-        createdBy: session.id 
+    await prisma.monthlyBudget.create({
+      data: {
+        month,
+        year,
+        amount: BigInt(amount),
+        createdBy: session.id,
       },
     })
 
-    // 2. Tandai sudah diproses bulan ini
+    // Tandai sudah diproses bulan ini
     await prisma.appSettings.update({
       where: { id: '1' },
       data: { lastCarryOverMonth: currentMonthStr },
     })
 
-    // 3. Catat log aktivitas pindah saldo
+    // Catat log aktivitas pindah saldo
     const remainingBalance = await getMonthRemainingBalance(month, year)
     const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
 
     await logActivity({
       action: 'BUDGET_UPDATE',
-      description: `${session.name} memindahkan sisa kas bulan lalu sebesar ${formatRupiah(amount)} ke kas bulan ${month}/${year}${balanceText}`,
-      details: { month, year, amount, action: 'agree', totalBudget: newAmount, remainingBalance },
+      description: `${session.name} memindahkan sisa kas ${prevMonth}/${prevYear} sebesar ${formatRupiah(amount)} ke kas bulan ${month}/${year}${balanceText}`,
+      details: { month, year, prevMonth, prevYear, amount, action: 'agree', totalBudget: amount, remainingBalance },
       memberId: session.id,
     })
 
-    return NextResponse.json({ success: true, newAmount })
+    return NextResponse.json({ success: true, newAmount: amount })
   } catch (error) {
     console.error('Transfer carryover error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

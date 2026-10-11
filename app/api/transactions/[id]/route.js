@@ -5,6 +5,7 @@ import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
 import { formatRupiah } from '@/lib/format'
+import { syncBudgetsForTransactionChange } from '@/lib/cashbook'
 
 export async function PUT(request, { params }) {
   try {
@@ -50,12 +51,17 @@ export async function PUT(request, { params }) {
       },
     })
 
+    // Sinkronkan kas: batalkan efek lama, terapkan efek baru (termasuk top-up
+    // yang nominal/tanggal/kategorinya diubah) dan teruskan ke bulan-bulan berikutnya
+    const adjustedMonths = await syncBudgetsForTransactionChange(transaction, updated)
+
     // Hitung sisa saldo setelah transaksi diubah
     const txDate = new Date(transactionDate)
     const txMonth = txDate.getUTCMonth() + 1
     const txYear = txDate.getUTCFullYear()
     const remainingBalance = await getMonthRemainingBalance(txMonth, txYear)
-    const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+    const balanceText = (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
+      (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
     // Catat log aktivitas edit
     await logActivity({
@@ -78,6 +84,7 @@ export async function PUT(request, { params }) {
           notes,
         },
         remainingBalance,
+        adjustedMonths,
       },
       memberId: session.id,
     })
@@ -111,37 +118,20 @@ export async function DELETE(request, { params }) {
     await prisma.transaction.delete({ where: { id } })
 
     // ─────────────────────────────────────────────────────────────────
-    // PERBAIKAN BUG: Jika yang dihapus adalah transaksi "Tambah Kas
-    // (Top-up)", maka budget bulanan harus dikurangi kembali agar
-    // saldo tetap sinkron dengan uang yang nyatanya dipegang.
+    // Sinkronkan kas: jika yang dihapus adalah top-up (pemasukan), kas
+    // bulan itu dikurangi kembali. Jika transaksi bulan lampau, perubahan
+    // sisa saldo diteruskan ke kas bulan-bulan berikutnya.
+    // (Tidak lagi dibatasi minimal 0 agar selisih tidak "hilang".)
     // ─────────────────────────────────────────────────────────────────
-    if (
-      transaction.category === 'pemasukan' &&
-      transaction.itemName === 'Tambah Kas (Top-up)'
-    ) {
-      const txDate = new Date(transaction.transactionDate)
-      const txMonth = txDate.getMonth() + 1
-      const txYear = txDate.getFullYear()
-
-      const existingBudget = await prisma.monthlyBudget.findUnique({
-        where: { uq_month_year: { month: txMonth, year: txYear } },
-      })
-
-      if (existingBudget) {
-        const newAmount = Number(existingBudget.amount) - Number(transaction.amount)
-        await prisma.monthlyBudget.update({
-          where: { uq_month_year: { month: txMonth, year: txYear } },
-          data: { amount: BigInt(Math.max(0, newAmount)) },
-        })
-      }
-    }
+    const adjustedMonths = await syncBudgetsForTransactionChange(transaction, null)
 
     // Hitung sisa saldo setelah transaksi dihapus
     const delDate = new Date(transaction.transactionDate)
     const delMonth = delDate.getUTCMonth() + 1
     const delYear = delDate.getUTCFullYear()
     const remainingBalance = await getMonthRemainingBalance(delMonth, delYear)
-    const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+    const balanceText = (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
+      (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
     // Catat log aktivitas hapus
     await logActivity({
@@ -155,6 +145,7 @@ export async function DELETE(request, { params }) {
         transactionDate: transaction.transactionDate.toISOString().split('T')[0],
         notes: transaction.notes,
         remainingBalance,
+        adjustedMonths,
       },
       memberId: session.id,
     })

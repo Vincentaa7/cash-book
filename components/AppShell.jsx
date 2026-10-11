@@ -37,12 +37,42 @@ export default function AppShell({ children }) {
   useEffect(() => {
     if (user?.role === 'admin' || user?.role === 'superadmin') {
       checkCarryOver()
+
+      // Timer tepat jam 00:00:01 waktu lokal pengguna agar pop up muncul pas pergantian hari/bulan
+      let midnightTimer = null
+      const scheduleNextMidnight = () => {
+        const now = new Date()
+        const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1)
+        const msUntilMidnight = Math.max(1000, nextMidnight.getTime() - now.getTime())
+        midnightTimer = setTimeout(() => {
+          checkCarryOver()
+          scheduleNextMidnight()
+        }, msUntilMidnight)
+      }
+      scheduleNextMidnight()
+
+      // Periksa juga ketika pengguna membuka kembali tab peramban setelah jam 00:00
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          checkCarryOver()
+        }
+      }
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+
+      return () => {
+        if (midnightTimer) clearTimeout(midnightTimer)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+      }
     }
   }, [user])
 
   async function checkCarryOver() {
     try {
-      const res = await fetch('/api/budget/check-carryover')
+      // Kirim waktu lokal peramban perangkat pengguna
+      const now = new Date()
+      const localMonth = now.getMonth() + 1
+      const localYear = now.getFullYear()
+      const res = await fetch(`/api/budget/check-carryover?month=${localMonth}&year=${localYear}`)
       const data = await res.json()
       if (data.hasCarryover) {
         setCarryOverData(data)

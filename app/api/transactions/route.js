@@ -5,6 +5,7 @@ import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
 import { formatRupiah } from '@/lib/format'
+import { syncBudgetsForTransactionChange } from '@/lib/cashbook'
 
 export async function GET(request) {
   try {
@@ -139,12 +140,17 @@ export async function POST(request) {
       },
     })
 
+    // Jika transaksi dicatat untuk bulan lampau (terlambat input), kurangi kas
+    // bulan-bulan sesudahnya yang berasal dari pindahan sisa saldo
+    const adjustedMonths = await syncBudgetsForTransactionChange(null, transaction)
+
     // Hitung sisa saldo setelah transaksi dicatat
     const txDate = new Date(transactionDate)
     const txMonth = txDate.getUTCMonth() + 1
     const txYear = txDate.getUTCFullYear()
     const remainingBalance = await getMonthRemainingBalance(txMonth, txYear)
-    const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+    const balanceText = (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
+      (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
     // Catat log aktivitas
     await logActivity({
@@ -158,6 +164,7 @@ export async function POST(request) {
         transactionDate,
         notes,
         remainingBalance,
+        adjustedMonths,
       },
       memberId: session.id,
     })

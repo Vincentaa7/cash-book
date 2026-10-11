@@ -2,22 +2,42 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { getAppToday } from '@/lib/cashbook'
 
-export async function GET() {
+export async function GET(request) {
   try {
     const session = await getSession()
     if (!session || (session.role !== 'admin' && session.role !== 'superadmin')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1
-    const currentYear = now.getFullYear()
+    const { searchParams } = new URL(request.url)
+    const paramMonth = parseInt(searchParams.get('month'))
+    const paramYear = parseInt(searchParams.get('year'))
+
+    // Prioritaskan waktu lokal pengguna dari browser (tepat 00:00 waktu lokal klien),
+    // fallback ke getAppToday() (WITA)
+    const today = getAppToday()
+    const currentMonth = (paramMonth >= 1 && paramMonth <= 12) ? paramMonth : today.month
+    const currentYear = (paramYear >= 2020 && paramYear <= 2100) ? paramYear : today.year
     const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
 
     // 1. Cek apakah sudah diproses bulan ini
     const settings = await prisma.appSettings.findFirst({ where: { id: '1' } })
     if (settings?.lastCarryOverMonth === currentMonthStr) {
+      return NextResponse.json({ hasCarryover: false })
+    }
+
+    // 1b. Jika kas bulan ini SUDAH diatur (manual), jangan tampilkan popup:
+    //     "Setuju" akan menggandakan saldo, "Tolak" dulu menghapus kas bulan ini.
+    const currentBudget = await prisma.monthlyBudget.findUnique({
+      where: { uq_month_year: { month: currentMonth, year: currentYear } },
+    })
+    if (currentBudget) {
+      await prisma.appSettings.update({
+        where: { id: '1' },
+        data: { lastCarryOverMonth: currentMonthStr },
+      })
       return NextResponse.json({ hasCarryover: false })
     }
 

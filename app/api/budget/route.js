@@ -5,6 +5,7 @@ import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
 import { formatRupiah } from '@/lib/format'
+import { getAppToday } from '@/lib/cashbook'
 
 export async function GET(request) {
   try {
@@ -80,10 +81,13 @@ export async function POST(request) {
         },
       })
 
-      // Tambah transaksi kas masuk ke riwayat
-      let txDate = new Date()
-      if (txDate.getMonth() + 1 !== parsedMonth || txDate.getFullYear() !== parsedYear) {
-        txDate = new Date(parsedYear, parsedMonth - 1, 1)
+      // Tambah transaksi kas masuk ke riwayat.
+      // Tanggal dibuat sebagai tanggal UTC murni (sesuai zona waktu WITA) agar
+      // top-up sebelum jam 08:00 tidak tercatat di tanggal/bulan sebelumnya.
+      const today = getAppToday()
+      let txDate = today.date
+      if (today.month !== parsedMonth || today.year !== parsedYear) {
+        txDate = new Date(Date.UTC(parsedYear, parsedMonth - 1, 1))
       }
 
       await prisma.transaction.create({
