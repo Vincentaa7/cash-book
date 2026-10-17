@@ -8,8 +8,8 @@ const COOKIE_NAME = 'cash-book-session'
 
 // Route yang tidak butuh autentikasi
 const PUBLIC_ROUTES = ['/login']
-// Route yang butuh role admin
-const ADMIN_ROUTES = ['/pengaturan']
+// Route yang butuh role admin khusus (kosong karena /pengaturan kini dapat diakses member untuk preferensi & profil sendiri)
+const ADMIN_ROUTES = []
 // Route yang bisa diakses semua member (eksplisit whitelist — tidak perlu tindakan khusus,
 // cukup pastikan /pribadi tidak masuk ADMIN_ROUTES)
 
@@ -58,6 +58,7 @@ export async function middleware(request) {
   requestHeaders.set('x-user-id', payload.id)
   requestHeaders.set('x-user-name', payload.name)
   requestHeaders.set('x-user-role', payload.role)
+  requestHeaders.set('x-family-id', payload.familyId || '1')
 
   return NextResponse.next({
     request: { headers: requestHeaders },

@@ -1,45 +1,7 @@
-// app/api/laporan/compare/route.js - Get Monthly Expense Comparison (6 months)
+// app/api/laporan/compare/route.js - Get Monthly Expense Comparison (6 months, Optimized Single-Batch)
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
-
-async function getMonthExpense(month, year, cutoffDate) {
-  const firstDay = new Date(Date.UTC(year, month - 1, 1))
-  const lastDay = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
-
-  let expenseAmount = 0
-  if (lastDay < cutoffDate) {
-    // Ambil dari monthly_snapshots
-    const snapshotAgg = await prisma.monthlySnapshot.aggregate({
-      where: { month, year, category: { not: 'pemasukan' } },
-      _sum: { totalAmount: true },
-    })
-    expenseAmount = Number(snapshotAgg._sum.totalAmount || 0)
-
-    // Jika snapshot kosong, coba fallback ke transactions
-    if (expenseAmount === 0) {
-      const txAgg = await prisma.transaction.aggregate({
-        where: {
-          transactionDate: { gte: firstDay, lte: lastDay },
-          category: { not: 'pemasukan' }
-        },
-        _sum: { amount: true },
-      })
-      expenseAmount = Number(txAgg._sum.amount || 0)
-    }
-  } else {
-    // Bulan masih dalam range 90 hari, ambil dari transactions
-    const txAgg = await prisma.transaction.aggregate({
-      where: {
-        transactionDate: { gte: firstDay, lte: lastDay },
-        category: { not: 'pemasukan' }
-      },
-      _sum: { amount: true },
-    })
-    expenseAmount = Number(txAgg._sum.amount || 0)
-  }
-  return expenseAmount
-}
 
 // Helper: offset month by N steps
 function offsetMonth(month, year, offsetMonths) {
@@ -57,6 +19,7 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
 
+    const familyId = session.familyId || '1'
     const { searchParams } = new URL(request.url)
     const now = new Date()
     const month = parseInt(searchParams.get('month')) || now.getMonth() + 1
@@ -67,19 +30,71 @@ export async function GET(request) {
     cutoffDate.setDate(cutoffDate.getDate() - 90)
     cutoffDate.setHours(0, 0, 0, 0)
 
-    // Ambil 6 bulan: current + 5 bulan sebelumnya
-    const months6 = []
+    const monthsList = []
     for (let i = -5; i <= 0; i++) {
-      const { month: m, year: y } = offsetMonth(month, year, i)
-      const amount = await getMonthExpense(m, y, cutoffDate)
-      months6.push({ month: m, year: y, amount })
+      monthsList.push(offsetMonth(month, year, i))
     }
+
+    const oldest = monthsList[0]
+    const newest = monthsList[monthsList.length - 1]
+    const rangeStart = new Date(Date.UTC(oldest.year, oldest.month - 1, 1))
+    const rangeEnd = new Date(Date.UTC(newest.year, newest.month, 0, 23, 59, 59, 999))
+    const yearsInRange = [...new Set(monthsList.map(m => m.year))]
+
+    // Eksekusi hanya 2 query paralel sekaligus (menggantikan 6-12 query berurutan sebelumnya)
+    const [txList, snapList] = await Promise.all([
+      prisma.transaction.findMany({
+        where: {
+          familyId,
+          transactionDate: { gte: rangeStart, lte: rangeEnd },
+          category: { not: 'pemasukan' },
+        },
+        select: {
+          amount: true,
+          transactionDate: true,
+        },
+      }),
+      prisma.monthlySnapshot.findMany({
+        where: {
+          familyId,
+          year: { in: yearsInRange },
+          category: { not: 'pemasukan' },
+        },
+        select: {
+          month: true,
+          year: true,
+          totalAmount: true,
+        },
+      }),
+    ])
+
+    const txByMonth = {}
+    for (const tx of txList) {
+      const d = new Date(tx.transactionDate)
+      const k = `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}`
+      txByMonth[k] = (txByMonth[k] || 0) + Number(tx.amount)
+    }
+
+    const snapByMonth = {}
+    for (const snap of snapList) {
+      const k = `${snap.year}-${snap.month}`
+      snapByMonth[k] = (snapByMonth[k] || 0) + Number(snap.totalAmount)
+    }
+
+    const months6 = monthsList.map(({ month: m, year: y }) => {
+      const lastDay = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999))
+      const key = `${y}-${m}`
+      const amount = lastDay < cutoffDate
+        ? (snapByMonth[key] || txByMonth[key] || 0)
+        : (txByMonth[key] || 0)
+      return { month: m, year: y, amount }
+    })
 
     // Current & previous
     const current = months6[5]  // index 5 = bulan target
     const previous = months6[4] // index 4 = bulan lalu
 
-    // Rata-rata 3 bulan terakhir (3 bulan sebelum current)
+    // Rata-rata 3 bulan terakhir
     const avg3Months = Math.round(
       (months6[3].amount + months6[4].amount + months6[5].amount) / 3
     )
@@ -98,10 +113,10 @@ export async function GET(request) {
       avg3Months,
       changePercent,
       changeTrend,
-      history: months6, // Array 6 bulan untuk bar chart
+      months6,
     })
   } catch (error) {
-    console.error('Get comparison error:', error)
+    console.error('Compare error:', error)
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
   }
 }

@@ -5,21 +5,30 @@ import bcrypt from 'bcryptjs'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { logActivity } from '@/lib/logger'
+import { generateUsernameSuggestions } from '@/lib/email'
 
 export async function PUT(request, { params }) {
   try {
     const session = await getSession()
-    if (!session || (session.role !== 'admin' && session.role !== 'superadmin')) {
-      return NextResponse.json({ error: 'Hanya admin yang bisa mengedit anggota' }, { status: 403 })
+    if (!session) {
+      return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
 
+    const familyId = session.familyId || '1'
     const { id } = await params
+    const isAdminOrSuper = session.role === 'admin' || session.role === 'superadmin'
+    const isSelf = session.id === id
+
+    if (!isAdminOrSuper && !isSelf) {
+      return NextResponse.json({ error: 'Anda hanya dapat mengedit profil Anda sendiri' }, { status: 403 })
+    }
+
     const existingMember = await prisma.member.findUnique({
       where: { id },
-      select: { id: true, name: true, role: true, avatarColor: true, isActive: true },
+      select: { id: true, familyId: true, name: true, role: true, avatarColor: true, isActive: true },
     })
 
-    if (!existingMember) {
+    if (!existingMember || existingMember.familyId !== familyId) {
       return NextResponse.json({ error: 'Anggota tidak ditemukan' }, { status: 404 })
     }
 
@@ -34,10 +43,31 @@ export async function PUT(request, { params }) {
     }
 
     const updateData = {}
-    if (name !== undefined) updateData.name = name
-    if (role !== undefined) updateData.role = role
+    if (name !== undefined && name.trim() !== existingMember.name) {
+      const cleanName = name.trim()
+      const duplicate = await prisma.member.findFirst({
+        where: { name: cleanName, id: { not: id } },
+        select: { id: true },
+      })
+      if (duplicate) {
+        const suggestions = await generateUsernameSuggestions(cleanName)
+        return NextResponse.json(
+          {
+            error: `Username "${cleanName}" sudah digunakan. Silakan pilih username unik lain.`,
+            code: 'USERNAME_TAKEN',
+            suggestions,
+          },
+          { status: 409 }
+        )
+      }
+      updateData.name = cleanName
+    }
+    // Hanya admin/superadmin yang boleh mengubah role atau status aktif
+    if (isAdminOrSuper) {
+      if (role !== undefined) updateData.role = role
+      if (isActive !== undefined) updateData.isActive = isActive
+    }
     if (avatarColor !== undefined) updateData.avatarColor = avatarColor
-    if (isActive !== undefined) updateData.isActive = isActive
     if (pin) {
       updateData.pin = await bcrypt.hash(pin, 10)
     }
@@ -69,13 +99,14 @@ export async function PUT(request, { params }) {
           isActive: existingMember.isActive,
         },
         new: {
-          name: name !== undefined ? name : existingMember.name,
+          name: updateData.name !== undefined ? updateData.name : existingMember.name,
           role: role !== undefined ? role : existingMember.role,
           avatarColor: avatarColor !== undefined ? avatarColor : existingMember.avatarColor,
           isActive: isActive !== undefined ? isActive : existingMember.isActive,
         },
       },
       memberId: session.id,
+      familyId,
     })
 
     return NextResponse.json({ member })
@@ -92,14 +123,15 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Hanya admin yang bisa menonaktifkan anggota' }, { status: 403 })
     }
 
+    const familyId = session.familyId || '1'
     const { id } = await params
 
     const existingMember = await prisma.member.findUnique({
       where: { id },
-      select: { id: true, name: true, role: true },
+      select: { id: true, familyId: true, name: true, role: true },
     })
 
-    if (!existingMember) {
+    if (!existingMember || existingMember.familyId !== familyId) {
       return NextResponse.json({ error: 'Anggota tidak ditemukan' }, { status: 404 })
     }
 
@@ -125,6 +157,7 @@ export async function DELETE(request, { params }) {
       description: `${session.name} menonaktifkan anggota "${existingMember.name}"`,
       details: { id, name: existingMember.name, isActive: false },
       memberId: session.id,
+      familyId,
     })
 
     return NextResponse.json({ success: true })

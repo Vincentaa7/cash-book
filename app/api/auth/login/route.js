@@ -1,4 +1,4 @@
-// app/api/auth/login/route.js - Login API
+// app/api/auth/login/route.js - Login API (Multi-Family Aware)
 
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
@@ -26,64 +26,87 @@ export async function POST(request) {
       )
     }
 
-    let body;
+    let body
     try {
       body = await request.json()
     } catch {
       return NextResponse.json({ error: 'Format pesan tidak valid' }, { status: 400 })
     }
-    console.log('[LOGIN] Payload diterima:', body)
     
     const { name, pin } = body
 
     if (!name || !pin) {
       return NextResponse.json(
-        { error: 'Nama dan PIN wajib diisi' },
+        { error: 'Username dan Password wajib diisi' },
         { status: 400 }
       )
     }
 
-    // Cari member berdasarkan nama (case-insensitive pada MySQL default)
-    const member = await prisma.member.findFirst({
+    const trimmedName = name.trim()
+
+    // Cari kandidat member berdasarkan username atau email
+    const candidates = await prisma.member.findMany({
       where: {
-        name: name,
+        OR: [
+          { name: trimmedName },
+          { email: trimmedName.toLowerCase() },
+        ],
         isActive: true,
       },
     })
 
-    if (!member) {
+    if (candidates.length === 0) {
       return NextResponse.json(
-        { error: 'Nama anggota tidak ditemukan atau tidak aktif' },
+        { error: 'Akun tidak ditemukan atau tidak aktif. Pastikan username sudah terdaftar.' },
         { status: 401 }
       )
     }
 
-    // Verifikasi PIN
-    const isPinValid = await bcrypt.compare(pin, member.pin)
-    if (!isPinValid) {
+    // Verifikasi PIN / Password terhadap kandidat yang cocok
+    let matchedMember = null
+    for (const candidate of candidates) {
+      const isPinValid = await bcrypt.compare(String(pin), candidate.pin)
+      if (isPinValid) {
+        matchedMember = candidate
+        break
+      }
+    }
+
+    if (!matchedMember) {
       return NextResponse.json(
-        { error: 'PIN salah' },
+        { error: 'Password salah' },
         { status: 401 }
       )
     }
 
-    // Generate JWT token
-    const token = await signToken({
-      id: member.id,
-      name: member.name,
-      role: member.role,
-      avatarColor: member.avatarColor,
-    })
+    const familyId = matchedMember.familyId || '1'
+
+    // Generate JWT token & ambil nama keluarga secara paralel
+    const [token, settings] = await Promise.all([
+      signToken({
+        id: matchedMember.id,
+        name: matchedMember.name,
+        role: matchedMember.role,
+        avatarColor: matchedMember.avatarColor,
+        familyId,
+      }),
+      prisma.appSettings.findUnique({
+        where: { id: familyId },
+        select: { familyName: true },
+      }),
+    ])
 
     // Set cookie
     const cookieOptions = createSessionCookie(token)
     const response = NextResponse.json({
       success: true,
+      familyName: settings?.familyName || 'Cash Book',
       user: {
-        id: member.id,
-        name: member.name,
-        role: member.role,
-        avatarColor: member.avatarColor,
+        id: matchedMember.id,
+        name: matchedMember.name,
+        role: matchedMember.role,
+        avatarColor: matchedMember.avatarColor,
+        familyId,
       },
     })
 

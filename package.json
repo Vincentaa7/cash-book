@@ -11,7 +11,9 @@
   "dependencies": {
     "@prisma/client": "^6.19.2",
     "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "framer-motion": "^14.3.0",
     "html2canvas": "^1.4.1",
     "jose": "^6.2.2",
     "jspdf": "^4.2.1",
@@ -19,11 +21,13 @@
     "lucide-react": "^1.7.0",
     "mysql2": "^3.20.0",
     "next": "14.2.35",
+    "nodemailer": "^10.1.2",
     "prisma": "^6.19.2",
     "react": "^18",
     "react-datepicker": "^9.1.0",
     "react-dom": "^18",
     "recharts": "^3.8.1",
+    "tailwind-merge": "^3.7.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

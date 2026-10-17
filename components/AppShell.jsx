@@ -16,34 +16,42 @@ import CarryOverModal from '@/components/CarryOverModal'
 import AiChatWidget from '@/components/AiChatWidget'
 
 const NAV_ITEMS = [
-  { href: '/dashboard',    labelKey: 'dashboard',      icon: LayoutDashboard },
-  { href: '/transaksi/baru', labelKey: 'add_expense',  icon: PlusCircle },
-  { href: '/transaksi',    labelKey: 'history',         icon: List },
-  { href: '/laporan',      labelKey: 'reports',         icon: BarChart2 },
-  { href: '/kalender',     labelKey: 'calendar',        icon: Calendar },
-  { href: '/pribadi',      labelKey: 'personal_ledger', icon: BookOpen },
-  { href: '/pengaturan',   labelKey: 'settings',        icon: Settings, adminOnly: true },
+  { href: '/dashboard',      labelKey: 'dashboard',       icon: LayoutDashboard },
+  { href: '/transaksi/baru', labelKey: 'add_expense',     icon: PlusCircle },
+  { href: '/transaksi',      labelKey: 'history',         icon: List },
+  { href: '/laporan',        labelKey: 'reports',         icon: BarChart2 },
+  { href: '/kalender',       labelKey: 'calendar',        icon: Calendar },
+  { href: '/pribadi',        labelKey: 'personal_ledger', icon: BookOpen },
+  { href: '/pengaturan',     labelKey: 'settings',        icon: Settings },
 ]
+
+// Cache di memori modul agar pindah antar-menu tidak menembak ulang API check-carryover setiap klik
+let lastCarryOverCheckKey = null
+let cachedCarryOverResult = null
 
 export default function AppShell({ children }) {
   const pathname = usePathname()
   const { t, language } = useLanguage()
   const { user, loading, familyName } = useUser()
   const [theme, setTheme] = useState('light')
-  const [carryOverData, setCarryOverData] = useState(null)
+  const [carryOverData, setCarryOverData] = useState(cachedCarryOverResult)
   const [isSnoozed, setIsSnoozed] = useState(false)
 
-  // Cek Pindahan Saldo (Hanya jika admin & login)
+  // Cek Pindahan Saldo (Hanya sekali per sesi keluarga atau saat tengah malam, tidak setiap pindah menu)
   useEffect(() => {
     if (user?.role === 'admin' || user?.role === 'superadmin') {
-      checkCarryOver()
+      const now = new Date()
+      const checkKey = `${user.familyId || '1'}-${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+      if (lastCarryOverCheckKey !== checkKey) {
+        checkCarryOver(checkKey)
+      }
 
       // Timer tepat jam 00:00:01 waktu lokal pengguna agar pop up muncul pas pergantian hari/bulan
       let midnightTimer = null
       const scheduleNextMidnight = () => {
-        const now = new Date()
-        const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1)
-        const msUntilMidnight = Math.max(1000, nextMidnight.getTime() - now.getTime())
+        const current = new Date()
+        const nextMidnight = new Date(current.getFullYear(), current.getMonth(), current.getDate() + 1, 0, 0, 1)
+        const msUntilMidnight = Math.max(1000, nextMidnight.getTime() - current.getTime())
         midnightTimer = setTimeout(() => {
           checkCarryOver()
           scheduleNextMidnight()
@@ -51,31 +59,26 @@ export default function AppShell({ children }) {
       }
       scheduleNextMidnight()
 
-      // Periksa juga ketika pengguna membuka kembali tab peramban setelah jam 00:00
-      const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') {
-          checkCarryOver()
-        }
-      }
-      document.addEventListener('visibilitychange', handleVisibilityChange)
-
       return () => {
         if (midnightTimer) clearTimeout(midnightTimer)
-        document.removeEventListener('visibilitychange', handleVisibilityChange)
       }
     }
   }, [user])
 
-  async function checkCarryOver() {
+  async function checkCarryOver(checkKey) {
     try {
-      // Kirim waktu lokal peramban perangkat pengguna
       const now = new Date()
       const localMonth = now.getMonth() + 1
       const localYear = now.getFullYear()
       const res = await fetch(`/api/budget/check-carryover?month=${localMonth}&year=${localYear}`)
       const data = await res.json()
+      if (checkKey) lastCarryOverCheckKey = checkKey
       if (data.hasCarryover) {
+        cachedCarryOverResult = data
         setCarryOverData(data)
+      } else {
+        cachedCarryOverResult = null
+        setCarryOverData(null)
       }
     } catch {}
   }
@@ -95,13 +98,13 @@ export default function AppShell({ children }) {
   }
 
   async function handleLogout() {
+    lastCarryOverCheckKey = null
+    cachedCarryOverResult = null
     await fetch('/api/auth/logout', { method: 'POST' })
     window.location.href = '/login'
   }
 
-  const visibleNavItems = NAV_ITEMS.filter(item =>
-    !item.adminOnly || user?.role === 'admin' || user?.role === 'superadmin'
-  )
+  const visibleNavItems = NAV_ITEMS
 
   if (loading || !user) {
     return (

@@ -8,7 +8,7 @@ import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import { formatNumber, formatDate, formatTime } from '@/lib/format'
 import { AVATAR_COLORS } from '@/lib/constants'
-import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle, Shield, Database, Trash, ClipboardList } from 'lucide-react'
+import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle, Shield, Database, Trash, ClipboardList, KeyRound, Copy, RefreshCw } from 'lucide-react'
 import DailyReminderSetup from '@/components/DailyReminderSetup'
 
 function PengaturanContent() {
@@ -45,18 +45,20 @@ function PengaturanContent() {
   const [showMemberModal, setShowMemberModal] = useState(false)
   const [editMember, setEditMember] = useState(null)
   const [memberForm, setMemberForm] = useState({ name: '', pin: '', role: 'member', avatarColor: AVATAR_COLORS[0].value })
+  const [memberModalError, setMemberModalError] = useState('')
+  const [memberSuggestions, setMemberSuggestions] = useState([])
 
-  // Settings state
+  // Settings & Family Invite Code state
   const [formFamilyName, setFormFamilyName] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
+  const [customInviteCode, setCustomInviteCode] = useState('')
+  const [codeCopied, setCodeCopied] = useState(false)
+  const [inviteLoading, setInviteLoading] = useState(false)
+
+  const isAdminOrSuper = user?.role === 'admin' || user?.role === 'superadmin'
 
   useEffect(() => {
-    if (user && user.role !== 'admin' && user.role !== 'superadmin') {
-      router.push('/dashboard')
-    }
-  }, [user, router])
-
-  useEffect(() => {
-    if (user?.role === 'admin' || user?.role === 'superadmin') {
+    if (user) {
       fetchData()
     }
   }, [user, currentMonth, currentYear])
@@ -76,6 +78,7 @@ function PengaturanContent() {
       }
       if (M.members) setMembers(M.members)
       if (s.settings?.familyName) setFormFamilyName(s.settings.familyName)
+      if (s.settings?.inviteCode) setInviteCode(s.settings.inviteCode)
     } catch {}
     setLoading(false)
   }
@@ -244,20 +247,26 @@ function PengaturanContent() {
   // --- Member Handlers ---
   function openAddMember() {
     setEditMember(null)
+    setMemberModalError('')
+    setMemberSuggestions([])
     setMemberForm({ name: '', pin: '', role: 'member', avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)].value })
     setShowMemberModal(true)
   }
 
   function openEditMember(m) {
     setEditMember(m)
+    setMemberModalError('')
+    setMemberSuggestions([])
     setMemberForm({ name: m.name, pin: '', role: m.role, avatarColor: m.avatarColor || AVATAR_COLORS[0].value })
     setShowMemberModal(true)
   }
 
   async function handleSaveMember(e) {
     e.preventDefault()
-    if (!memberForm.name.trim()) return showMessage('error', t('required_field'))
-    if (!editMember && !memberForm.pin) return showMessage('error', t('required_field'))
+    setMemberModalError('')
+    setMemberSuggestions([])
+    if (!memberForm.name.trim()) return setMemberModalError(t('required_field'))
+    if (!editMember && !memberForm.pin) return setMemberModalError(t('required_field'))
 
     setLoading(true)
     try {
@@ -274,18 +283,78 @@ function PengaturanContent() {
         body: JSON.stringify(data)
       })
 
+      const d = await res.json()
       if (res.ok) {
         setShowMemberModal(false)
         fetchData()
         showMessage('success', `${t('family_members')} ${editMember ? t('edit') : t('add_member')}`)
       } else {
-        const d = await res.json()
+        setMemberModalError(d.error || t('connection_error'))
+        if (d.suggestions && Array.isArray(d.suggestions)) {
+          setMemberSuggestions(d.suggestions)
+        }
+      }
+    } catch {
+      setMemberModalError(t('connection_error'))
+    }
+    setLoading(false)
+  }
+
+  async function handleCopyInviteCode() {
+    if (!inviteCode) return
+    try {
+      await navigator.clipboard.writeText(inviteCode)
+      setCodeCopied(true)
+      setTimeout(() => setCodeCopied(false), 2500)
+    } catch {}
+  }
+
+  async function handleGenerateInviteCode() {
+    setInviteLoading(true)
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inviteCodeAction: 'generate' }),
+      })
+      const d = await res.json()
+      if (res.ok && d.settings?.inviteCode) {
+        setInviteCode(d.settings.inviteCode)
+        showMessage('success', t('invite_code_updated'))
+      } else {
         showMessage('error', d.error || t('connection_error'))
       }
     } catch {
       showMessage('error', t('connection_error'))
     }
-    setLoading(false)
+    setInviteLoading(false)
+  }
+
+  async function handleSaveCustomInviteCode(e) {
+    e.preventDefault()
+    if (!customInviteCode.trim()) return
+    setInviteLoading(true)
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inviteCodeAction: 'custom',
+          customInviteCode: customInviteCode.trim().toUpperCase(),
+        }),
+      })
+      const d = await res.json()
+      if (res.ok && d.settings?.inviteCode) {
+        setInviteCode(d.settings.inviteCode)
+        setCustomInviteCode('')
+        showMessage('success', t('invite_code_updated'))
+      } else {
+        showMessage('error', d.error || t('connection_error'))
+      }
+    } catch {
+      showMessage('error', t('connection_error'))
+    }
+    setInviteLoading(false)
   }
 
   async function handleToggleMemberActive(id, currentStatus) {
@@ -336,7 +405,7 @@ function PengaturanContent() {
     setLoading(false)
   }
 
-  if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) return null
+  if (!user) return null
 
   return (
     <>
@@ -421,8 +490,8 @@ function PengaturanContent() {
                     {initialBudget > 0 ? t('budget_locked_info') : t('set_budget_first')}
                   </p>
                   
-                  {/* Set Initial Budget (Only visible/editable if not set) */}
-                  <form onSubmit={handleSaveBudget} style={{ maxWidth: 400, marginBottom: initialBudget > 0 ? 32 : 0 }}>
+                  {/* Set Initial Budget (Only visible/editable if not set & admin/superadmin) */}
+                  <form onSubmit={handleSaveBudget} style={{ maxWidth: 400, marginBottom: (initialBudget > 0 && isAdminOrSuper) ? 32 : 0 }}>
                     <div className="form-group">
                       <label className="form-label">{t('total_budget')} (Rp)</label>
                       <div style={{ position: 'relative' }}>
@@ -433,12 +502,12 @@ function PengaturanContent() {
                           className="form-input"
                           style={{ 
                             paddingLeft: 40, 
-                            backgroundColor: initialBudget > 0 ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                            backgroundColor: (!isAdminOrSuper || initialBudget > 0) ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
                             color: 'var(--text-primary)',
-                            cursor: initialBudget > 0 ? 'not-allowed' : 'text'
+                            cursor: (!isAdminOrSuper || initialBudget > 0) ? 'not-allowed' : 'text'
                           }}
                           placeholder="0"
-                          readOnly={initialBudget > 0}
+                          readOnly={!isAdminOrSuper || initialBudget > 0}
                           value={budgetAmount ? formatNumber(parseInt(budgetAmount)) : ''}
                           onChange={e => {
                             const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -447,15 +516,15 @@ function PengaturanContent() {
                         />
                       </div>
                     </div>
-                    {initialBudget === 0 && (
+                    {isAdminOrSuper && initialBudget === 0 && (
                       <button type="submit" className="btn btn-primary" disabled={loading}>
                         {loading ? t('loading') : t('save')}
                       </button>
                     )}
                   </form>
 
-                  {/* Add Cash (Top-up) - Only visible if budget exists */}
-                  {initialBudget > 0 && (
+                  {/* Add Cash (Top-up) - Only visible if budget exists and user is admin/superadmin */}
+                  {isAdminOrSuper && initialBudget > 0 && (
                     <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 16, border: '1px dashed var(--border-color)', width: '100%', boxSizing: 'border-box', transition: 'background-color 0.3s ease, border-color 0.3s ease' }}>
                       <h4 style={{ margin: '0 0 14px 0', fontSize: '1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
                          <PlusCircle size={18} color="#10b981" /> {t('add_cash')}
@@ -489,76 +558,155 @@ function PengaturanContent() {
             )}
 
             {activeTab === 'members' && (
-              <div className="card fade-in-up">
-                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <h3 className="card-title">{t('family_members')} ({members.filter(m => m.isActive).length}/5)</h3>
-                  <button className="btn btn-primary btn-sm" onClick={openAddMember} disabled={members.filter(m => m.isActive).length >= 5}>
-                    <PlusCircle size={15} /> {t('add_member')}
-                  </button>
+              <div style={{ display: 'grid', gap: 20 }}>
+                {/* Kode Khusus Keluarga (Family Invite Code) Card */}
+                <div className="card fade-in-up" style={{ border: '1px solid var(--border-focus)', background: 'linear-gradient(135deg, rgba(13,148,136,0.06), rgba(16,185,129,0.03))' }}>
+                  <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <KeyRound size={18} color="#0d9488" />
+                    <h3 className="card-title" style={{ margin: 0 }}>{t('invite_code_title')}</h3>
+                  </div>
+                  <div className="card-body">
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.6, marginBottom: 16 }}>
+                      {t('invite_code_desc')}
+                    </p>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginBottom: user?.role === 'superadmin' ? 18 : 0 }}>
+                      <div style={{
+                        padding: '10px 18px',
+                        borderRadius: 12,
+                        background: 'var(--bg-secondary)',
+                        border: '2px dashed #0d9488',
+                        fontFamily: 'monospace',
+                        fontSize: '1.25rem',
+                        fontWeight: 800,
+                        letterSpacing: '0.12em',
+                        color: 'var(--text-primary)',
+                        userSelect: 'all'
+                      }}>
+                        {inviteCode || 'CB-....-....'}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleCopyInviteCode}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 42 }}
+                      >
+                        {codeCopied ? <Check size={16} /> : <Copy size={16} />}
+                        {codeCopied ? t('invite_code_copied') : t('invite_code_copy')}
+                      </button>
+
+                      {user?.role === 'superadmin' && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={handleGenerateInviteCode}
+                          disabled={inviteLoading}
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 42 }}
+                        >
+                          <RefreshCw size={15} className={inviteLoading ? 'spin' : ''} />
+                          {t('invite_code_generate')}
+                        </button>
+                      )}
+                    </div>
+
+                    {user?.role === 'superadmin' && (
+                      <form onSubmit={handleSaveCustomInviteCode} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', maxWidth: 480 }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          style={{ flex: '1 1 220px', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.06em' }}
+                          placeholder={t('invite_code_custom_placeholder')}
+                          value={customInviteCode}
+                          onChange={e => setCustomInviteCode(e.target.value.toUpperCase())}
+                          minLength={6}
+                          maxLength={24}
+                        />
+                        <button
+                          type="submit"
+                          className="btn btn-secondary btn-sm"
+                          disabled={inviteLoading || customInviteCode.trim().length < 6}
+                          style={{ minHeight: 42 }}
+                        >
+                          {t('invite_code_custom_btn')}
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </div>
-                <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>{t('member_name')}</th>
-                        <th className="hide-on-mobile">{t('member_role')}</th>
-                        <th className="hide-on-mobile">{t('member_status')}</th>
-                        <th>{t('actions')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {members.map(m => (
-                        <tr key={m.id} style={{ opacity: m.isActive ? 1 : 0.6 }}>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                              <div style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', background: m.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '0.8rem' }}>
-                                {m.name.substring(0,2).toUpperCase()}
-                              </div>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <span style={{ fontWeight: 500, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{m.name}</span>
-                                {m.id === user.id && <span className="badge badge-gray" style={{ marginTop: 2, display: 'inline-flex' }}>{t('you_label')}</span>}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="hide-on-mobile">
-                             {m.role === 'superadmin' ?
-                              <span className="badge" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', color: 'white', display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content' }}><Shield size={12}/> Super Admin</span> :
-                              m.role === 'admin' ? 
-                              <span className="badge badge-purple"><Shield size={12}/> Admin</span> : 
-                              <span className="badge badge-blue">{t('member_role')}</span>
-                             }
-                          </td>
-                          <td className="hide-on-mobile">
-                            {m.isActive ? <span className="text-success text-sm font-medium">{t('active')}</span> : <span className="text-danger text-sm font-medium">{t('inactive')}</span>}
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              {m.role !== 'superadmin' && (
-                                <button className="btn-icon" onClick={() => openEditMember(m)} title="Edit"><Edit2 size={16}/></button>
-                              )}
-                              {m.role !== 'superadmin' && (
-                                <button 
-                                  className="btn-icon" 
-                                  onClick={() => handleToggleMemberActive(m.id, m.isActive)}
-                                  disabled={m.id === user.id}
-                                  title={m.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-                                  style={{ color: m.isActive ? 'var(--color-danger)' : 'var(--color-success)' }}
-                                >
-                                  {m.isActive ? <Trash2 size={16}/> : <Check size={16}/>}
-                                </button>
-                              )}
-                              {m.role === 'superadmin' && m.id === user.id && (
-                                <button className="btn-icon" onClick={() => openEditMember(m)} title="Edit profil sendiri"><Edit2 size={16}/></button>
-                              )}
-                              {m.role === 'superadmin' && m.id !== user.id && (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '0 4px' }}>🔒 Terlindungi</span>
-                              )}
-                            </div>
-                          </td>
+
+                {/* Daftar Anggota Keluarga */}
+                <div className="card fade-in-up">
+                  <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <h3 className="card-title">{t('family_members')} ({members.filter(m => m.isActive).length}/5)</h3>
+                    {isAdminOrSuper && (
+                      <button className="btn btn-primary btn-sm" onClick={openAddMember} disabled={members.filter(m => m.isActive).length >= 5}>
+                        <PlusCircle size={15} /> {t('add_member')}
+                      </button>
+                    )}
+                  </div>
+                  <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>{t('member_name')}</th>
+                          <th className="hide-on-mobile">{t('member_role')}</th>
+                          <th className="hide-on-mobile">{t('member_status')}</th>
+                          <th>{t('actions')}</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {members.map(m => (
+                          <tr key={m.id} style={{ opacity: m.isActive ? 1 : 0.6 }}>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                                <div style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', background: m.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '0.8rem' }}>
+                                  {m.name.substring(0,2).toUpperCase()}
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <span style={{ fontWeight: 500, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{m.name}</span>
+                                  {m.id === user.id && <span className="badge badge-gray" style={{ marginTop: 2, display: 'inline-flex' }}>{t('you_label')}</span>}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="hide-on-mobile">
+                               {m.role === 'superadmin' ?
+                                <span className="badge" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', color: 'white', display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content' }}><Shield size={12}/> Super Admin</span> :
+                                m.role === 'admin' ? 
+                                <span className="badge badge-purple"><Shield size={12}/> Admin</span> : 
+                                <span className="badge badge-blue">{t('member_role')}</span>
+                               }
+                            </td>
+                            <td className="hide-on-mobile">
+                              {m.isActive ? <span className="text-success text-sm font-medium">{t('active')}</span> : <span className="text-danger text-sm font-medium">{t('inactive')}</span>}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                {/* Admin/Superadmin dapat edit anggota non-superadmin, dan setiap user (termasuk member) dapat edit profilnya sendiri */}
+                                {((isAdminOrSuper && m.role !== 'superadmin') || m.id === user.id) && (
+                                  <button className="btn-icon" onClick={() => openEditMember(m)} title="Edit"><Edit2 size={16}/></button>
+                                )}
+                                {isAdminOrSuper && m.role !== 'superadmin' && (
+                                  <button 
+                                    className="btn-icon" 
+                                    onClick={() => handleToggleMemberActive(m.id, m.isActive)}
+                                    disabled={m.id === user.id}
+                                    title={m.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                                    style={{ color: m.isActive ? 'var(--color-danger)' : 'var(--color-success)' }}
+                                  >
+                                    {m.isActive ? <Trash2 size={16}/> : <Check size={16}/>}
+                                  </button>
+                                )}
+                                {m.role === 'superadmin' && m.id !== user.id && (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '0 4px' }}>🔒 Terlindungi</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -573,6 +721,7 @@ function PengaturanContent() {
                     <label className="form-label">{t('select_language')}</label>
                     <div className="flex gap-2" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
                        <button 
+                        type="button"
                         onClick={() => changeLanguage('id')}
                         className={`btn ${language === 'id' ? 'btn-primary' : 'btn-secondary'}`}
                         style={{ display: 'flex', alignItems: 'center', gap: 6 }}
@@ -580,6 +729,7 @@ function PengaturanContent() {
                          🇮🇩 Indonesia
                        </button>
                        <button 
+                        type="button"
                         onClick={() => changeLanguage('en')}
                         className={`btn ${language === 'en' ? 'btn-primary' : 'btn-secondary'}`}
                         style={{ display: 'flex', alignItems: 'center', gap: 6 }}
@@ -587,6 +737,7 @@ function PengaturanContent() {
                          🇺🇸 English
                        </button>
                        <button 
+                        type="button"
                         onClick={() => changeLanguage('nl')}
                         className={`btn ${language === 'nl' ? 'btn-primary' : 'btn-secondary'}`}
                         style={{ display: 'flex', alignItems: 'center', gap: 6 }}
@@ -606,12 +757,16 @@ function PengaturanContent() {
                         className="form-input"
                         value={formFamilyName}
                         onChange={e => setFormFamilyName(e.target.value)}
+                        readOnly={!isAdminOrSuper}
+                        style={!isAdminOrSuper ? { backgroundColor: 'var(--bg-tertiary)', cursor: 'not-allowed' } : {}}
                         placeholder="e.g. Smith Family"
                       />
                     </div>
-                    <button type="submit" className="btn btn-primary" disabled={loading}>
-                      {loading ? t('loading') : t('save')}
-                    </button>
+                    {isAdminOrSuper && (
+                      <button type="submit" className="btn btn-primary" disabled={loading}>
+                        {loading ? t('loading') : t('save')}
+                      </button>
+                    )}
                   </form>
 
                   <hr style={{ margin: '28px 0', borderColor: 'var(--border-color)', opacity: 0.5 }} />
@@ -919,6 +1074,38 @@ function PengaturanContent() {
             </div>
             <form onSubmit={handleSaveMember}>
               <div className="modal-body" style={{ display: 'grid', gap: 16 }}>
+                {memberModalError && (
+                  <div className="alert alert-danger" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 8, margin: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <AlertCircle size={16} />
+                      <span>{memberModalError}</span>
+                    </div>
+                    {memberSuggestions.length > 0 && (
+                      <div style={{ width: '100%', paddingTop: 6, borderTop: '1px solid rgba(239,68,68,0.25)' }}>
+                        <div style={{ fontSize: '0.75rem', marginBottom: 6, fontWeight: 600 }}>
+                          {t('auth_suggestions_title')}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {memberSuggestions.map(sug => (
+                            <button
+                              key={sug}
+                              type="button"
+                              className="badge badge-teal"
+                              style={{ cursor: 'pointer', border: '1px solid #0d9488', padding: '4px 10px', fontSize: '0.8rem' }}
+                              onClick={() => {
+                                setMemberForm(f => ({ ...f, name: sug }))
+                                setMemberModalError('')
+                                setMemberSuggestions([])
+                              }}
+                            >
+                              @{sug}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">{t('member_name')}</label>
                   <input
@@ -926,15 +1113,14 @@ function PengaturanContent() {
                     className="form-input"
                     value={memberForm.name}
                     onChange={e => setMemberForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="Masukkan nama anggota"
+                    placeholder="Masukkan nama anggota / username unik"
                     required
                   />
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Password Login (4-6 digit angka)</label>
+                  <label className="form-label">{t('auth_password_label')}</label>
                   <input
                     type="password"
-                    inputMode="numeric"
                     className="form-input"
                     value={memberForm.pin}
                     onChange={e => setMemberForm(f => ({ ...f, pin: e.target.value }))}

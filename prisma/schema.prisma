@@ -1,4 +1,4 @@
-// Prisma Schema untuk Cash Book - Manajemen Keuangan Keluarga
+// Prisma Schema untuk Cash Book - Manajemen Keuangan Keluarga (Multi-Family SaaS)
 // Provider: MySQL (kompatibel dengan TiDB Cloud)
 
 generator client {
@@ -11,13 +11,16 @@ datasource db {
 }
 
 model Member {
-  id          String   @id @default(uuid()) @db.Char(36)
-  name        String   @db.VarChar(100)
-  role        String   @default("member") @db.VarChar(10) // 'admin' atau 'member'
-  avatarColor String?  @map("avatar_color") @db.VarChar(20)
-  pin         String   @db.VarChar(255) // hashed PIN
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid()) @db.Char(36)
+  familyId      String   @default("1") @map("family_id") @db.Char(36)
+  name          String   @db.VarChar(100)
+  email         String?  @unique @db.VarChar(191)
+  emailVerified Boolean  @default(true) @map("email_verified")
+  role          String   @default("member") @db.VarChar(10) // 'superadmin', 'admin', atau 'member'
+  avatarColor   String?  @map("avatar_color") @db.VarChar(20)
+  pin           String   @db.VarChar(255) // hashed PIN / password
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   // Relasi
   transactions         Transaction[]         @relation("MemberTransactions")
@@ -26,11 +29,13 @@ model Member {
   personalTransactions PersonalTransaction[] @relation("MemberPersonalTx")
   personalBudgets      PersonalBudget[]      @relation("MemberPersonalBudgets")
 
+  @@index([familyId])
   @@map("members")
 }
 
 model MonthlyBudget {
   id        String   @id @default(uuid()) @db.Char(36)
+  familyId  String   @default("1") @map("family_id") @db.Char(36)
   month     Int      // 1-12
   year      Int
   amount    BigInt   // dalam Rupiah
@@ -40,12 +45,14 @@ model MonthlyBudget {
   // Relasi
   creator Member? @relation("MemberBudgets", fields: [createdBy], references: [id])
 
-  @@unique([month, year], name: "uq_month_year")
+  @@unique([familyId, month, year], name: "uq_month_year")
+  @@index([familyId])
   @@map("monthly_budgets")
 }
 
 model Transaction {
   id              String    @id @default(uuid()) @db.Char(36)
+  familyId        String    @default("1") @map("family_id") @db.Char(36)
   itemName        String    @map("item_name") @db.VarChar(255)
   amount          BigInt    // dalam Rupiah
   category        String    @db.VarChar(100)
@@ -60,6 +67,7 @@ model Transaction {
   // Relasi
   member Member? @relation("MemberTransactions", fields: [memberId], references: [id])
 
+  @@index([familyId])
   @@index([transactionDate])
   @@index([category])
   @@index([memberId])
@@ -69,6 +77,7 @@ model Transaction {
 model AppSettings {
   id                  String   @id @default("1") @db.Char(36)
   familyName          String   @default("Cash Book") @map("family_name") @db.VarChar(100)
+  inviteCode          String?  @unique @map("invite_code") @db.VarChar(50)
   theme               String   @default("light") @db.VarChar(10)
   lastCarryOverMonth  String?  @map("last_carry_over_month") @db.VarChar(7)
   updatedAt           DateTime @updatedAt @map("updated_at")
@@ -79,6 +88,7 @@ model AppSettings {
 // Tabel untuk menyimpan rekap bulanan setelah transaksi satuan dihapus (> 90 hari)
 model MonthlySnapshot {
   id          String   @id @default(uuid()) @db.Char(36)
+  familyId    String   @default("1") @map("family_id") @db.Char(36)
   month       Int      // 1-12
   year        Int
   category    String   @db.VarChar(100)
@@ -86,13 +96,15 @@ model MonthlySnapshot {
   txCount     Int      @map("tx_count")       // jumlah transaksi yang diarsipkan
   archivedAt  DateTime @default(now()) @map("archived_at")
 
-  @@unique([month, year, category], name: "uq_snapshot")
+  @@unique([familyId, month, year, category], name: "uq_snapshot")
+  @@index([familyId])
   @@map("monthly_snapshots")
 }
 
 model ActivityLog {
   id          String   @id @default(uuid()) @db.Char(36)
-  action      String   @db.VarChar(50) // 'TRANSACTION_CREATE', 'TRANSACTION_UPDATE', 'TRANSACTION_DELETE', 'BUDGET_UPDATE', 'MEMBER_CREATE', 'MEMBER_TOGGLE_ACTIVE'
+  familyId    String   @default("1") @map("family_id") @db.Char(36)
+  action      String   @db.VarChar(50)
   description String   @db.Text
   details     String?  @db.Text        // JSON string
   memberId    String?  @map("member_id") @db.Char(36)
@@ -100,6 +112,7 @@ model ActivityLog {
 
   member Member? @relation("MemberActivityLogs", fields: [memberId], references: [id])
 
+  @@index([familyId])
   @@index([memberId])
   @@map("activity_logs")
 }
@@ -140,3 +153,18 @@ model PersonalBudget {
   @@map("personal_budgets")
 }
 
+// Tabel sementara untuk verifikasi OTP Email pendaftaran Superadmin baru
+model EmailVerification {
+  id          String   @id @default(uuid()) @db.Char(36)
+  email       String   @unique @db.VarChar(191)
+  username    String   @db.VarChar(100)
+  pinHash     String   @map("pin_hash") @db.VarChar(255)
+  familyName  String   @map("family_name") @db.VarChar(100)
+  avatarColor String?  @map("avatar_color") @db.VarChar(20)
+  otpHash     String   @map("otp_hash") @db.VarChar(255)
+  attempts    Int      @default(0)
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("email_verifications")
+}

@@ -2,6 +2,19 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+@tailwind components;
+
+.cashbook-auth-root button {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+}
+
+@tailwind utilities;
+
 /* ============================================================
    CSS Custom Properties (Design Tokens)
 ============================================================ */
@@ -2578,3 +2591,69 @@ img { max-width: 100%; display: block; }
   color: var(--text-primary);
 }
 
+/* ============================================================
+   Android & iOS Mobile Responsiveness & Smooth Performance
+============================================================ */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+button, a, .nav-link, .bottom-nav-item, .settings-tab-btn, .category-grid-item {
+  touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  /* Prevent iOS Safari automatic zoom when focusing inputs (< 16px triggers zoom) */
+  input,
+  select,
+  textarea,
+  .form-input,
+  .form-select,
+  .form-textarea,
+  .search-input {
+    font-size: 16px !important;
+  }
+
+  /* iOS Home Indicator & Android Gesture Bar Safe Area Support */
+  .bottom-nav {
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .main-content {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .mobile-header {
+    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(60px + env(safe-area-inset-top, 0px));
+  }
+
+  /* Dynamic viewport height for modals on mobile keyboards */
+  .modal {
+    max-height: calc(100dvh - 32px);
+    margin: auto;
+  }
+
+  .modal-header {
+    padding: 16px 18px;
+  }
+
+  .modal-body {
+    padding: 18px;
+  }
+
+  .modal-footer {
+    padding: 14px 18px;
+  }
+
+  /* Disable hover translateY on touch devices to prevent sticky hover states */
+  .card:hover,
+  .summary-card:hover {
+    transform: none !important;
+  }
+}

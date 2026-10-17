@@ -11,6 +11,7 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const familyId = session.familyId || '1'
     const { searchParams } = new URL(request.url)
     const paramMonth = parseInt(searchParams.get('month'))
     const paramYear = parseInt(searchParams.get('year'))
@@ -23,7 +24,7 @@ export async function GET(request) {
     const currentMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
 
     // 1. Cek apakah sudah diproses bulan ini
-    const settings = await prisma.appSettings.findFirst({ where: { id: '1' } })
+    const settings = await prisma.appSettings.findUnique({ where: { id: familyId } })
     if (settings?.lastCarryOverMonth === currentMonthStr) {
       return NextResponse.json({ hasCarryover: false })
     }
@@ -31,11 +32,11 @@ export async function GET(request) {
     // 1b. Jika kas bulan ini SUDAH diatur (manual), jangan tampilkan popup:
     //     "Setuju" akan menggandakan saldo, "Tolak" dulu menghapus kas bulan ini.
     const currentBudget = await prisma.monthlyBudget.findUnique({
-      where: { uq_month_year: { month: currentMonth, year: currentYear } },
+      where: { uq_month_year: { familyId, month: currentMonth, year: currentYear } },
     })
     if (currentBudget) {
       await prisma.appSettings.update({
-        where: { id: '1' },
+        where: { id: familyId },
         data: { lastCarryOverMonth: currentMonthStr },
       })
       return NextResponse.json({ hasCarryover: false })
@@ -54,10 +55,11 @@ export async function GET(request) {
 
     const [budgetPrev, expensePrev] = await Promise.all([
       prisma.monthlyBudget.findUnique({
-        where: { uq_month_year: { month: prevMonth, year: prevYear } },
+        where: { uq_month_year: { familyId, month: prevMonth, year: prevYear } },
       }),
       prisma.transaction.aggregate({
         where: {
+          familyId,
           transactionDate: { gte: firstDayPrev, lte: lastDayPrev },
           category: { not: 'pemasukan' },
         },

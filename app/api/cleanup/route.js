@@ -1,6 +1,6 @@
 // app/api/cleanup/route.js
 // Endpoint untuk mengarsipkan & menghapus transaksi satuan yang sudah > 90 hari
-// Hanya bisa diakses oleh admin
+// Hanya bisa diakses oleh superadmin
 
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
@@ -27,14 +27,15 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Hanya superadmin yang bisa mengakses' }, { status: 403 })
     }
 
+    const familyId = session.familyId || '1'
     const cutoff = getCutoffDate()
 
-    // Hitung total semua transaksi di database
-    const totalAllTx = await prisma.transaction.count()
+    // Hitung total semua transaksi keluarga di database
+    const totalAllTx = await prisma.transaction.count({ where: { familyId } })
 
-    // Ambil transaksi yang sudah lebih dari 90 hari
+    // Ambil transaksi keluarga yang sudah lebih dari 90 hari
     const oldTransactions = await prisma.transaction.findMany({
-      where: { transactionDate: { lt: cutoff } },
+      where: { familyId, transactionDate: { lt: cutoff } },
       select: {
         id: true,
         amount: true,
@@ -95,11 +96,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Hanya superadmin yang bisa mengakses' }, { status: 403 })
     }
 
+    const familyId = session.familyId || '1'
     const cutoff = getCutoffDate()
 
-    // 1. Ambil semua transaksi yang akan diarsipkan
+    // 1. Ambil semua transaksi keluarga yang akan diarsipkan
     const oldTransactions = await prisma.transaction.findMany({
-      where: { transactionDate: { lt: cutoff } },
+      where: { familyId, transactionDate: { lt: cutoff } },
       select: {
         id: true,
         amount: true,
@@ -140,6 +142,7 @@ export async function POST(request) {
         prisma.monthlySnapshot.upsert({
           where: {
             uq_snapshot: {
+              familyId,
               month: snap.month,
               year: snap.year,
               category: snap.category,
@@ -151,6 +154,7 @@ export async function POST(request) {
             txCount: { increment: snap.txCount },
           },
           create: {
+            familyId,
             month: snap.month,
             year: snap.year,
             category: snap.category,
@@ -164,7 +168,7 @@ export async function POST(request) {
     // 4. Hapus transaksi satuan yang sudah diarsipkan
     const idsToDelete = oldTransactions.map(tx => tx.id)
     const deleteResult = await prisma.transaction.deleteMany({
-      where: { id: { in: idsToDelete } },
+      where: { id: { in: idsToDelete }, familyId },
     })
 
     // Hitung bulan unik yang terdampak

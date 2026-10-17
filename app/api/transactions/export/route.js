@@ -12,13 +12,14 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
 
+    const familyId = session.familyId || '1'
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const month = searchParams.get('month')
     const year = searchParams.get('year')
 
-    const where = {}
+    const where = { familyId }
     if (month && year) {
       const m = parseInt(month)
       const y = parseInt(year)

@@ -11,6 +11,8 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
 
+    const familyId = session.familyId || '1'
+
     // Rate limiting: Max 12 pesan per menit per user untuk mencegah DoS query & kuota AI
     const rateCheck = checkRateLimit(`ai-chat:${session.id}`, 12, 60000)
     if (!rateCheck.success) {
@@ -35,30 +37,33 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Pesan tidak valid' }, { status: 400 })
     }
 
-    // 4. Query Data Keuangan dari Database sebagai Konteks AI
+    // 4. Query Data Keuangan Keluarga dari Database sebagai Konteks AI
     const [members, budgets, snapshots, transactions, appSettings] = await Promise.all([
-      // Ambil daftar anggota aktif
+      // Ambil daftar anggota aktif keluarga ini
       prisma.member.findMany({
-        where: { isActive: true },
+        where: { familyId, isActive: true },
         select: { id: true, name: true, role: true }
       }),
-      // Ambil seluruh data anggaran kas bulanan
+      // Ambil seluruh data anggaran kas bulanan keluarga ini
       prisma.monthlyBudget.findMany({
+        where: { familyId },
         orderBy: [{ year: 'desc' }, { month: 'desc' }]
       }),
-      // Ambil ringkasan arsip data transaksi lama (> 90 hari)
+      // Ambil ringkasan arsip data transaksi lama (> 90 hari) keluarga ini
       prisma.monthlySnapshot.findMany({
+        where: { familyId },
         orderBy: [{ year: 'desc' }, { month: 'desc' }]
       }),
-      // Ambil seluruh transaksi satuan terdaftar (terbaru/maksimal 90 hari)
+      // Ambil seluruh transaksi satuan terdaftar keluarga ini
       prisma.transaction.findMany({
+        where: { familyId },
         include: {
           member: { select: { name: true } }
         },
         orderBy: { transactionDate: 'desc' }
       }),
-      // Ambil pengaturan umum aplikasi (nama keluarga)
-      prisma.appSettings.findFirst()
+      // Ambil pengaturan umum aplikasi keluarga ini
+      prisma.appSettings.findUnique({ where: { id: familyId } })
     ])
 
     const familyName = appSettings?.familyName || 'Keluarga'

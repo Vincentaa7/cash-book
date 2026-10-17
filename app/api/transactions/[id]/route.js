@@ -14,15 +14,16 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
 
+    const familyId = session.familyId || '1'
     const { id } = await params
     const transaction = await prisma.transaction.findUnique({ where: { id } })
 
-    if (!transaction) {
+    if (!transaction || transaction.familyId !== familyId) {
       return NextResponse.json({ error: 'Transaksi tidak ditemukan' }, { status: 404 })
     }
 
     // Cek akses: admin bisa edit semua, member hanya edit miliknya dalam 24 jam
-    const isAdmin = session.role === 'admin' || session.role === 'superadmin'
+    const isAdmin = session.role === 'admin' || session.role !== undefined && session.role === 'superadmin'
     const isOwner = transaction.memberId === session.id
     const isWithin24h = (Date.now() - new Date(transaction.createdAt).getTime()) < 24 * 60 * 60 * 1000
 
@@ -59,7 +60,7 @@ export async function PUT(request, { params }) {
     const txDate = new Date(transactionDate)
     const txMonth = txDate.getUTCMonth() + 1
     const txYear = txDate.getUTCFullYear()
-    const remainingBalance = await getMonthRemainingBalance(txMonth, txYear)
+    const remainingBalance = await getMonthRemainingBalance(txMonth, txYear, familyId)
     const balanceText = (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
       (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
@@ -87,6 +88,7 @@ export async function PUT(request, { params }) {
         adjustedMonths,
       },
       memberId: session.id,
+      familyId,
     })
 
     return NextResponse.json({
@@ -105,12 +107,13 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Hanya admin yang bisa menghapus transaksi' }, { status: 403 })
     }
 
+    const familyId = session.familyId || '1'
     const { id } = await params
     const transaction = await prisma.transaction.findUnique({
       where: { id },
     })
 
-    if (!transaction) {
+    if (!transaction || transaction.familyId !== familyId) {
       return NextResponse.json({ error: 'Transaksi tidak ditemukan' }, { status: 404 })
     }
 
@@ -129,7 +132,7 @@ export async function DELETE(request, { params }) {
     const delDate = new Date(transaction.transactionDate)
     const delMonth = delDate.getUTCMonth() + 1
     const delYear = delDate.getUTCFullYear()
-    const remainingBalance = await getMonthRemainingBalance(delMonth, delYear)
+    const remainingBalance = await getMonthRemainingBalance(delMonth, delYear, familyId)
     const balanceText = (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
       (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
@@ -148,6 +151,7 @@ export async function DELETE(request, { params }) {
         adjustedMonths,
       },
       memberId: session.id,
+      familyId,
     })
 
     return NextResponse.json({ success: true })
@@ -156,4 +160,3 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })
   }
 }
-

@@ -14,6 +14,7 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
 
+    const familyId = session.familyId || '1'
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page')) || 1)
     const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit')) || 20), 100)
@@ -27,8 +28,8 @@ export async function GET(request) {
     const month = searchParams.get('month')
     const year = searchParams.get('year')
 
-    // Build where clause
-    const where = {}
+    // Build where clause scoped by familyId
+    const where = { familyId }
 
     if (search) {
       where.OR = [
@@ -116,6 +117,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
 
+    const familyId = session.familyId || '1'
     const { itemName, amount, category, transactionDate, notes } = await request.json()
 
     if (!itemName || !amount || !category || !transactionDate) {
@@ -128,6 +130,7 @@ export async function POST(request) {
 
     const transaction = await prisma.transaction.create({
       data: {
+        familyId,
         itemName,
         amount: BigInt(amount),
         category,
@@ -148,7 +151,7 @@ export async function POST(request) {
     const txDate = new Date(transactionDate)
     const txMonth = txDate.getUTCMonth() + 1
     const txYear = txDate.getUTCFullYear()
-    const remainingBalance = await getMonthRemainingBalance(txMonth, txYear)
+    const remainingBalance = await getMonthRemainingBalance(txMonth, txYear, familyId)
     const balanceText = (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
       (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
@@ -167,6 +170,7 @@ export async function POST(request) {
         adjustedMonths,
       },
       memberId: session.id,
+      familyId,
     })
 
     return NextResponse.json({

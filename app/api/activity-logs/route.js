@@ -13,6 +13,7 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Hanya superadmin yang bisa mengakses log aktivitas' }, { status: 403 })
     }
 
+    const familyId = session.familyId || '1'
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 25
@@ -20,6 +21,7 @@ export async function GET(request) {
 
     const [logs, total] = await Promise.all([
       prisma.activityLog.findMany({
+        where: { familyId },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -33,7 +35,7 @@ export async function GET(request) {
           },
         },
       }),
-      prisma.activityLog.count(),
+      prisma.activityLog.count({ where: { familyId } }),
     ])
 
     return NextResponse.json({

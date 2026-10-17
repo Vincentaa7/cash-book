@@ -1,15 +1,12 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 
 const UserContext = createContext(null)
 
 export const useUser = () => {
-  const context = useContext(UserContext)
-  // We don't throw error here to allow components outside AppShell to handle null if needed,
-  // but for translated pages, it's better to use useLanguage.
-  return context
+  return useContext(UserContext)
 }
 
 export function UserProvider({ children }) {
@@ -17,47 +14,56 @@ export function UserProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [familyName, setFamilyName] = useState('Cash Book')
   const router = useRouter()
+  const pathname = usePathname()
 
-  useEffect(() => {
-    fetchUser()
-    fetchSettings()
-  }, [])
+  const fetchUser = useCallback(async () => {
+    // Jika sedang di halaman login, tidak perlu memanggil /api/auth/me agar halaman login ringan & cepat
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/login')) {
+      setLoading(false)
+      return
+    }
 
-  async function fetchUser() {
     try {
       const res = await fetch('/api/auth/me')
       if (res.ok) {
         const data = await res.json()
         setUser(data.user)
+        if (data.familyName) {
+          setFamilyName(data.familyName)
+        }
       } else {
-        // Only redirect if we are not on the login page
-        if (window.location.pathname !== '/login') {
-          router.push('/login')
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          router.replace('/login')
         }
       }
     } catch {
-      if (window.location.pathname !== '/login') {
-        router.push('/login')
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        router.replace('/login')
       }
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
 
-  async function fetchSettings() {
-    try {
-      const res = await fetch('/api/settings')
-      if (res.ok) {
-        const data = await res.json()
-        if (data.settings?.familyName) {
-          setFamilyName(data.settings.familyName)
-        }
-      }
-    } catch {}
-  }
+  useEffect(() => {
+    // Hanya fetch jika user belum terisi dan bukan di halaman /login
+    if (!user && pathname && !pathname.startsWith('/login')) {
+      fetchUser()
+    } else if (pathname && pathname.startsWith('/login')) {
+      setLoading(false)
+    }
+  }, [pathname, user, fetchUser])
+
+  const loginSuccess = useCallback((userData, familyNameData) => {
+    setUser(userData)
+    if (familyNameData) {
+      setFamilyName(familyNameData)
+    }
+    setLoading(false)
+  }, [])
 
   return (
-    <UserContext.Provider value={{ user, setUser, loading, familyName, setFamilyName }}>
+    <UserContext.Provider value={{ user, setUser, loading, familyName, setFamilyName, loginSuccess }}>
       {children}
     </UserContext.Provider>
   )

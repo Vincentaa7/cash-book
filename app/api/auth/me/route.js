@@ -1,4 +1,4 @@
-// app/api/auth/me/route.js - Get current user info
+// app/api/auth/me/route.js - Get current user info + familyName in a single round-trip
 
 import { NextResponse } from 'next/server'
 import { getSession, clearSessionCookie } from '@/lib/auth'
@@ -11,10 +11,18 @@ export async function GET() {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
 
-    const member = await prisma.member.findUnique({
-      where: { id: session.id },
-      select: { id: true, name: true, role: true, avatarColor: true, isActive: true },
-    })
+    const familyId = session.familyId || '1'
+
+    const [member, settings] = await Promise.all([
+      prisma.member.findUnique({
+        where: { id: session.id },
+        select: { id: true, familyId: true, name: true, email: true, role: true, avatarColor: true, isActive: true },
+      }),
+      prisma.appSettings.findUnique({
+        where: { id: familyId },
+        select: { familyName: true },
+      }),
+    ])
 
     if (!member || !member.isActive) {
       const cookieOptions = clearSessionCookie()
@@ -23,7 +31,13 @@ export async function GET() {
       return response
     }
 
-    return NextResponse.json({ user: member })
+    return NextResponse.json({
+      user: {
+        ...member,
+        familyId: member.familyId || '1',
+      },
+      familyName: settings?.familyName || 'Cash Book',
+    })
   } catch (error) {
     console.error('Get me error:', error)
     return NextResponse.json({ error: 'Terjadi kesalahan server' }, { status: 500 })

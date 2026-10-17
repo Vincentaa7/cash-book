@@ -14,6 +14,7 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Tidak terautentikasi' }, { status: 401 })
     }
 
+    const familyId = session.familyId || '1'
     const { searchParams } = new URL(request.url)
     const month = parseInt(searchParams.get('month')) || new Date().getMonth() + 1
     const year = parseInt(searchParams.get('year')) || new Date().getFullYear()
@@ -22,6 +23,7 @@ export async function GET(request) {
     if (history) {
       // Ambil 6 bulan terakhir untuk chart tren
       const budgets = await prisma.monthlyBudget.findMany({
+        where: { familyId },
         orderBy: [{ year: 'desc' }, { month: 'desc' }],
         take: 6,
         include: { creator: { select: { name: true } } },
@@ -33,7 +35,7 @@ export async function GET(request) {
     }
 
     const budget = await prisma.monthlyBudget.findUnique({
-      where: { uq_month_year: { month, year } },
+      where: { uq_month_year: { familyId, month, year } },
       include: { creator: { select: { name: true } } },
     })
 
@@ -53,6 +55,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Hanya admin yang bisa mengatur kas bulanan' }, { status: 403 })
     }
 
+    const familyId = session.familyId || '1'
     const { month, year, amount, action = 'set' } = await request.json()
     const parsedMonth = parseInt(month)
     const parsedYear = parseInt(year)
@@ -66,7 +69,7 @@ export async function POST(request) {
     if (action === 'add') {
       // Periksa apakah budget sudah ada sebelum increment
       const existing = await prisma.monthlyBudget.findUnique({
-        where: { uq_month_year: { month: parsedMonth, year: parsedYear } }
+        where: { uq_month_year: { familyId, month: parsedMonth, year: parsedYear } }
       })
 
       if (!existing) {
@@ -74,7 +77,7 @@ export async function POST(request) {
       }
 
       budget = await prisma.monthlyBudget.update({
-        where: { uq_month_year: { month: parsedMonth, year: parsedYear } },
+        where: { uq_month_year: { familyId, month: parsedMonth, year: parsedYear } },
         data: {
           amount: { increment: parsedAmount },
           createdBy: session.id,
@@ -92,6 +95,7 @@ export async function POST(request) {
 
       await prisma.transaction.create({
         data: {
+          familyId,
           itemName: 'Tambah Kas (Top-up)',
           amount: parsedAmount,
           category: 'pemasukan',
@@ -102,7 +106,7 @@ export async function POST(request) {
       })
 
       // Hitung sisa saldo setelah kas ditambah
-      const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear)
+      const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear, familyId)
       const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
 
       // Catat log aktivitas tambah kas
@@ -111,16 +115,18 @@ export async function POST(request) {
         description: `${session.name} menambah kas bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}${balanceText}`,
         details: { month: parsedMonth, year: parsedYear, amount, action, total: Number(budget.amount), remainingBalance },
         memberId: session.id,
+        familyId,
       })
     } else {
       // Upsert: update jika ada, create jika belum
       budget = await prisma.monthlyBudget.upsert({
-        where: { uq_month_year: { month: parsedMonth, year: parsedYear } },
+        where: { uq_month_year: { familyId, month: parsedMonth, year: parsedYear } },
         update: {
           amount: parsedAmount,
           createdBy: session.id,
         },
         create: {
+          familyId,
           month: parsedMonth,
           year: parsedYear,
           amount: parsedAmount,
@@ -129,7 +135,7 @@ export async function POST(request) {
       })
 
       // Hitung sisa saldo setelah kas utama diatur
-      const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear)
+      const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear, familyId)
       const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
 
       // Catat log aktivitas set kas utama
@@ -138,6 +144,7 @@ export async function POST(request) {
         description: `${session.name} menetapkan kas utama bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}${balanceText}`,
         details: { month: parsedMonth, year: parsedYear, amount, action, remainingBalance },
         memberId: session.id,
+        familyId,
       })
     }
 
