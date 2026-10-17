@@ -12,6 +12,7 @@ export default function AiChatWidget() {
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [activeModel, setActiveModel] = useState('Multi-Model AI (Groq)')
   
   const messagesEndRef = useRef(null)
 
@@ -75,6 +76,10 @@ export default function AiChatWidget() {
         return
       }
 
+      if (data.modelUsed) {
+        setActiveModel(`${data.modelUsed.split('/').pop()} (Groq)`)
+      }
+
       // Tambahkan jawaban bot ke list
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
     } catch (err) {
@@ -130,7 +135,7 @@ export default function AiChatWidget() {
                 <div className="ai-chat-header-name">{t('ai_assistant') || 'Asisten AI Keuangan'}</div>
                 <div className="ai-chat-header-status">
                   <span className="status-dot"></span>
-                  Llama 3.3 (Groq API)
+                  {activeModel}
                 </div>
               </div>
             </div>

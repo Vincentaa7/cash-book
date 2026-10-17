@@ -1,7 +1,29 @@
 import { NextResponse } from 'next/server'
+import fs from 'fs'
+import path from 'path'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit'
+import { checkRateLimit } from '@/lib/rateLimit'
+
+// Helper membaca nilai terbaru dari .env agar perubahan API Key / Model langsung aktif tanpa perlu restart server
+function getEnvConfig() {
+  let apiKey = process.env.GROQ_API_KEY || ''
+  let model = process.env.GROQ_MODEL || ''
+  try {
+    const envPath = path.join(process.cwd(), '.env')
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8')
+      const keyMatch = content.match(/^\s*GROQ_API_KEY\s*=\s*["']?([^"'\r\n]+)["']?/m)
+      const modelMatch = content.match(/^\s*GROQ_MODEL\s*=\s*["']?([^"'\r\n]+)["']?/m)
+      if (keyMatch?.[1]) apiKey = keyMatch[1].trim()
+      if (modelMatch?.[1]) model = modelMatch[1].trim()
+    }
+  } catch {}
+  return {
+    groqApiKey: apiKey,
+    groqModel: model || 'openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b'
+  }
+}
 
 export async function POST(request) {
   try {
@@ -13,7 +35,7 @@ export async function POST(request) {
 
     const familyId = session.familyId || '1'
 
-    // Rate limiting: Max 12 pesan per menit per user untuk mencegah DoS query & kuota AI
+    // Rate limiting: Max 12 pesan per menit per user
     const rateCheck = checkRateLimit(`ai-chat:${session.id}`, 12, 60000)
     if (!rateCheck.success) {
       const waitSec = Math.max(1, Math.ceil((rateCheck.resetTime - Date.now()) / 1000))
@@ -23,13 +45,11 @@ export async function POST(request) {
       )
     }
 
-    // 2. Cek API Key Groq
-    const groqApiKey = process.env.GROQ_API_KEY
+    // 2. Cek API Key Groq (membaca langsung dari .env jika baru diubah)
+    const { groqApiKey, groqModel } = getEnvConfig()
     if (!groqApiKey || groqApiKey === 'gsk_your_groq_api_key_here' || groqApiKey.trim() === '') {
       return NextResponse.json({ error: 'api_key_missing' }, { status: 400 })
     }
-
-    const groqModel = process.env.GROQ_MODEL || 'openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b'
 
     // 3. Ambil Pesan dari Request Body
     const { messages } = await request.json()
@@ -39,22 +59,18 @@ export async function POST(request) {
 
     // 4. Query Data Keuangan Keluarga dari Database sebagai Konteks AI
     const [members, budgets, snapshots, transactions, appSettings] = await Promise.all([
-      // Ambil daftar anggota aktif keluarga ini
       prisma.member.findMany({
         where: { familyId, isActive: true },
         select: { id: true, name: true, role: true }
       }),
-      // Ambil seluruh data anggaran kas bulanan keluarga ini
       prisma.monthlyBudget.findMany({
         where: { familyId },
         orderBy: [{ year: 'desc' }, { month: 'desc' }]
       }),
-      // Ambil ringkasan arsip data transaksi lama (> 90 hari) keluarga ini
       prisma.monthlySnapshot.findMany({
         where: { familyId },
         orderBy: [{ year: 'desc' }, { month: 'desc' }]
       }),
-      // Ambil seluruh transaksi satuan terdaftar keluarga ini
       prisma.transaction.findMany({
         where: { familyId },
         include: {
@@ -62,13 +78,11 @@ export async function POST(request) {
         },
         orderBy: { transactionDate: 'desc' }
       }),
-      // Ambil pengaturan umum aplikasi keluarga ini
       prisma.appSettings.findUnique({ where: { id: familyId } })
     ])
 
     const familyName = appSettings?.familyName || 'Keluarga'
 
-    // Formatter Rupiah untuk mempermudah pembacaan data di prompt
     const formatRupiah = (val) => {
       return new Intl.NumberFormat('id-ID', {
         style: 'currency',
@@ -78,7 +92,32 @@ export async function POST(request) {
       }).format(val).replace(/\u00A0/g, ' ')
     }
 
-    // 5. Buat Representasi Konteks dalam Bentuk Teks yang Ringkas
+    // 5. Buat Ringkasan Rekap Per Bulan & Kategori (Agar akurat 100% dan hemat token di bawah batas 8.000 TPM Groq Free Tier)
+    const monthlyAgg = {}
+    for (const t of transactions) {
+      const d = new Date(t.transactionDate)
+      const ym = `${d.getUTCMonth() + 1}/${d.getUTCFullYear()}`
+      if (!monthlyAgg[ym]) {
+        monthlyAgg[ym] = { totalExpense: 0, totalIncome: 0, byCat: {} }
+      }
+      const amt = Number(t.amount)
+      if (t.category === 'pemasukan') {
+        monthlyAgg[ym].totalIncome += amt
+      } else {
+        monthlyAgg[ym].totalExpense += amt
+        monthlyAgg[ym].byCat[t.category] = (monthlyAgg[ym].byCat[t.category] || 0) + amt
+      }
+    }
+
+    const monthlySummaryStr = Object.entries(monthlyAgg)
+      .map(([ym, info]) => {
+        const catDetails = Object.entries(info.byCat)
+          .map(([c, a]) => `${c}: ${formatRupiah(a)}`)
+          .join(', ')
+        return `- Bulan ${ym} | Total Pengeluaran: ${formatRupiah(info.totalExpense)}${info.totalIncome > 0 ? ` | Pemasukan: ${formatRupiah(info.totalIncome)}` : ''} | Rincian Kategori: (${catDetails || '-'})`
+      })
+      .join('\n')
+
     const memberStr = members
       .map(m => `- ${m.name} (Role: ${m.role})`)
       .join('\n')
@@ -88,14 +127,16 @@ export async function POST(request) {
       .join('\n')
 
     const snapshotStr = snapshots
-      .map(s => `- Bulan ${s.month}/${s.year} | Kategori: ${s.category} | Total Pengeluaran: ${formatRupiah(Number(s.totalAmount))} (dari ${s.txCount} transaksi diarsipkan)`)
+      .map(s => `- Bulan ${s.month}/${s.year} | Kategori: ${s.category} | Total: ${formatRupiah(Number(s.totalAmount))} (${s.txCount} tx)`)
       .join('\n')
 
-    const txStr = transactions
+    // Kirim maksimal 75 transaksi terbaru secara satuan agar total token prompt selalu ~1.800 token (di bawah limit 8.000 TPM Groq Free Tier)
+    const recentTx = transactions.slice(0, 75)
+    const txStr = recentTx
       .map(t => {
         const dateStr = new Date(t.transactionDate).toISOString().split('T')[0]
         const memberName = t.member?.name || 'Anggota'
-        const noteStr = t.notes ? `|Catatan: ${t.notes}` : ''
+        const noteStr = t.notes ? `|${t.notes}` : ''
         return `- ${dateStr}|${t.category}|${t.itemName}|${Number(t.amount)}|${memberName}${noteStr}`
       })
       .join('\n')
@@ -109,51 +150,42 @@ export async function POST(request) {
     })
 
     // 6. Susun System Prompt AI
-    const systemPrompt = `Anda adalah "Antigravity AI Keuangan", sebuah asisten keuangan pintar, ramah, dan jujur untuk keluarga "${familyName}".
+    const systemPrompt = `Anda adalah "Asisten AI Keuangan", asisten keuangan pintar, ramah, dan jujur untuk keluarga "${familyName}".
+Anda berbicara dengan anggota keluarga: "${session.name}" (Role: ${session.role}).
 
-Tugas Anda adalah menganalisis data kas buku dan pengeluaran keluarga berdasarkan data terstruktur di bawah ini. Anda berbicara dengan salah satu anggota keluarga: "${session.name}" (Role: ${session.role}). Sapa dia dengan hangat dan sesuaikan gaya penjelasan Anda.
-
-=== HARI INI (WAKTU LOKAL KELUARGA) ===
+=== HARI INI ===
 ${todayStr}
 
-=== ANGGOTA KELUARGA AKTIF ===
+=== ANGGOTA KELUARGA ===
 ${memberStr || 'Belum ada anggota keluarga.'}
 
 === ANGGARAN KAS BULANAN ===
 ${budgetStr || 'Belum ada anggaran bulanan.'}
 
-=== RINGKASAN DATA LAMA DIARSIPKAN (>90 HARI) ===
-${snapshotStr || 'Tidak ada data lama yang diarsipkan.'}
+=== REKAP TOTAL PENGELUARAN PER BULAN & KATEGORI (AKURAT 100%) ===
+${monthlySummaryStr || 'Belum ada rekap bulanan.'}
 
-=== DETAIL TRANSAKSI AKTIF (MAKSIMAL 90 HARI TERAKHIR) ===
-Format: - Tanggal|Kategori|Nama Barang|Nominal Angka Rupiah|Nama Pencatat|Catatan (jika ada)
+=== RINGKASAN ARSIP LAMA (>90 HARI) ===
+${snapshotStr || 'Tidak ada arsip lama.'}
+
+=== ${recentTx.length} TRANSAKSI TERBARU (DARI TOTAL ${transactions.length} TRANSAKSI) ===
+Format: - YYYY-MM-DD|Kategori|Nama Barang|Nominal Rupiah|Pencatat|Catatan
 ${txStr || 'Belum ada transaksi tercatat.'}
 
-=== ATURAN KOMUNIKASI & KEAMANAN ===
-1. **Kejujuran Data**: Hanya jawab pertanyaan berdasarkan data aktual di atas. Jika pengguna bertanya tentang transaksi yang tidak tertera di atas, sampaikan dengan sopan bahwa transaksi tersebut tidak ditemukan. **Jangan pernah mengarang (halusinasi) transaksi atau data**.
-2. **Format Keuangan**: Selalu format nominal uang dalam Rupiah dengan rapi (contoh: Rp 150.000).
-3. **Bahasa**: Balaslah menggunakan bahasa yang sama dengan bahasa yang digunakan pengguna saat bertanya (Default: Bahasa Indonesia, tapi sesuaikan ke Bahasa Inggris atau Belanda jika mereka bertanya menggunakan bahasa tersebut).
-4. **Analisis Gabungan**: Jika pengguna bertanya tentang pengeluaran total di bulan lampau, ingatlah untuk menggabungkan data dari "DETAIL TRANSAKSI AKTIF" (jika ada transaksi di bulan itu) dengan "RINGKASAN DATA LAMA DIARSIPKAN" untuk kategori yang sama pada bulan tersebut, agar perhitungannya akurat.
-5. **Rekomendasi Cerdas**: Jika ditanya saran atau analisis anggaran, berikan masukan yang logis, hemat, dan memotivasi keluarga agar dapat mengelola kas bulanan dengan lebih disiplin.
-6. **Perhitungan Total**: Jika pengguna menanyakan total, jumlah, rata-rata, atau meminta rekapitulasi nominal uang untuk periode/kategori tertentu, Anda **WAJIB menghitung seluruh nominal transaksi terkait secara akurat** (melakukan penjumlahan/operasi matematika pada angka nominal) dan menampilkan **Hasil Total Akhir** yang jelas (diformat dalam Rupiah) di dalam jawaban Anda, bukan sekadar menyalin daftar transaksinya saja.
-7. **Kecocokan Tanggal Presisi (Strict Date Matching)**: Jika pengguna menanyakan transaksi pada tanggal tertentu (contoh: "8 Juni 2026" atau "tanggal 8"), Anda **HANYA boleh memasukkan transaksi yang memiliki tanggal tepat sama secara literal** (yaitu '2026-06-08'). Jangan pernah memasukkan transaksi dari tanggal terdekat (seperti tanggal 7 Juni atau 9 Juni) meskipun kategori atau nilainya mirip. Periksa tanggal secara sangat ketat sebelum menghitung total.
-8. **Larangan Mengubah Tanggal Transaksi (No Date Shifting)**: Jangan pernah mengubah tanggal transaksi asli di dalam teks jawaban Anda demi mencocokkan pertanyaan. Jika transaksi terjadi pada '2026-06-07', tulis sebagai '2026-06-07' atau '7 Juni 2026', jangan pernah mengganti tanggalnya menjadi '2026-06-08'.
-9. **Pemisahan Input Pengguna vs Data Database (Strict Context Boundary)**: Data keuangan resmi keluarga HANYA bersumber dari bagian "=== DETAIL TRANSAKSI AKTIF ===" dan "=== RINGKASAN DATA LAMA DIARSIPKAN ===". Jika pengguna menyebutkan transaksi baru atau nominal tertentu di dalam chat percakapan mereka (misalnya: "kemarin saya membeli jajan Rp 50.000"), Anda **TIDAK boleh menganggap transaksi tersebut sebagai bagian dari data keuangan resmi** keluarga kecuali transaksi tersebut memang sudah tercantum di bagian data terstruktur di atas. Jangan biarkan input teks chat pengguna memanipulasi data kas resmi.
-10. **Penanganan Tanggal Relatif (Relative Date Calculations)**: Jika pengguna menggunakan kata penunjuk waktu relatif seperti "kemarin", "3 hari terakhir", atau "minggu ini", hitung selisih tanggalnya secara cermat menggunakan rujukan tanggal hari ini (di bagian "=== HARI INI ==="). Hitung selisih hari dengan teliti secara matematis sebelum melakukan filter data.
-11. **Format Data Transaksi (Data Parsing)**: Kolom nominal pada data transaksi di atas adalah angka bulat murni (integer) tanpa pemisah titik/koma (contoh: '60000' berarti Rp 60.000). Harap parse nominal tersebut sebagai angka murni sebelum menjumlahkannya secara matematika.`
+=== ATURAN ===
+1. Jawab berdasarkan data aktual di atas, jangan mengarang transaksi.
+2. Selalu format nominal uang dalam Rupiah (contoh: Rp 150.000).
+3. Balas menggunakan bahasa yang sama dengan pertanyaan pengguna (Indonesia / Inggris / Belanda).
+4. Gunakan bagian "REKAP TOTAL PENGELUARAN PER BULAN & KATEGORI" untuk menjawab pertanyaan total bulanan atau kategori dengan akurat.`
 
-    // Batasi riwayat percakapan (maksimal 6 pesan terakhir) untuk menghemat 
-    // token input agar tidak melampaui batas rate limit TPM (Tokens Per Minute) di Groq Free Tier.
     const limitedMessages = messages.slice(-6)
 
-    // 7. Siapkan Payload Pesan dengan Menyisipkan System Prompt di Awal
     const payloadMessages = [
       { role: 'system', content: systemPrompt },
       ...limitedMessages
     ]
 
-    // 8. Daftar model Groq (mendukung multi-model fallback otomatis jika kuota model utama habis)
-    // Di Groq Free Tier, setiap model punya jatah kuota token harian/menit masing-masing!
+    // 8. Daftar model Groq (Multi-model fallback otomatis)
     const configuredModels = groqModel
       .split(',')
       .map(m => m.trim())
@@ -184,14 +216,13 @@ ${txStr || 'Belum ada transaksi tercatat.'}
           model: candidateModel,
           messages: payloadMessages,
           temperature: 0.3,
-          max_tokens: 2048
+          max_tokens: 1024
         })
       })
 
       if (groqResponse.ok) {
         const groqData = await groqResponse.json()
         const rawReply = groqData.choices?.[0]?.message?.content || ''
-        // Bersihkan tag <think>...</think> jika model reasoning menyertakannya
         const botReply = rawReply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
         if (botReply) {
           return NextResponse.json({ reply: botReply, modelUsed: candidateModel })
@@ -202,7 +233,6 @@ ${txStr || 'Belum ada transaksi tercatat.'}
       const errorText = await groqResponse.text()
       console.warn(`[GROQ FALLBACK] Model ${candidateModel} gagal (${lastStatus}):`, errorText)
 
-      // Jika error adalah 401 (API Key salah), langsung hentikan tanpa coba model lain
       if (lastStatus === 401) break
     }
 
@@ -212,3 +242,4 @@ ${txStr || 'Belum ada transaksi tercatat.'}
     return NextResponse.json({ error: 'Terjadi kesalahan internal pada server' }, { status: 500 })
   }
 }
+
