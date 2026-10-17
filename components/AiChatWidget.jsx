@@ -2,13 +2,13 @@
 // components/AiChatWidget.jsx - Balon chat melayang AI Asisten Keuangan
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, Send, Bot, AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/components/LanguageContext'
 
 // Helper memformat teks inline: mengubah **tebal** menjadi <strong>, menghapus simbol * liar, dan mengunci nominal Rp agar tidak terpotong baris
 function renderInlineText(text = '') {
   if (!text) return null
-  // Bersihkan simbol markdown liar seperti *** atau `
   const cleaned = String(text)
     .replace(/\*{3,}/g, '**')
     .replace(/`/g, '')
@@ -21,16 +21,22 @@ function renderInlineText(text = '') {
     if (!part) return null
     if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
       const inner = part.slice(2, -2).replace(/\*/g, '').trim()
-      // Jika di dalam bold adalah nominal Rp, jaga agar tetap nowrap
       if (/^Rp\s?[\d.,]+/i.test(inner)) {
-        return <strong key={i} className="ai-currency">{inner}</strong>
+        return (
+          <strong key={i} className="ai-currency" style={{ whiteSpace: 'nowrap', fontWeight: 700 }}>
+            {inner.replace(/\s+/g, '\u00A0')}
+          </strong>
+        )
       }
-      return <strong key={i} className="ai-bold">{inner}</strong>
+      return <strong key={i} className="ai-bold" style={{ fontWeight: 700 }}>{inner}</strong>
     }
     if (/^Rp\s?[\d.,]+/i.test(part)) {
-      return <span key={i} className="ai-currency">{part.replace(/\s+/g, '\u00A0')}</span>
+      return (
+        <span key={i} className="ai-currency" style={{ whiteSpace: 'nowrap', fontWeight: 700 }}>
+          {part.replace(/\s+/g, '\u00A0')}
+        </span>
+      )
     }
-    // Hapus sisa tanda bintang tunggal yang tidak berpasangan
     return part.replace(/\*/g, '')
   })
 }
@@ -40,6 +46,7 @@ function renderFormattedMessage(content = '') {
   if (!content) return null
   const lines = String(content)
     .replace(/\r\n/g, '\n')
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-') // Normalisasi strip Unicode dari gpt-oss-120b
     .split('\n')
 
   const elements = []
@@ -48,7 +55,11 @@ function renderFormattedMessage(content = '') {
   const flushList = (keyPrefix) => {
     if (listItems.length > 0) {
       elements.push(
-        <div key={`list-${keyPrefix}`} className="ai-list-group">
+        <div
+          key={`list-${keyPrefix}`}
+          className="ai-list-group"
+          style={{ display: 'flex', flexDirection: 'column', gap: '6px', margin: '2px 0' }}
+        >
           {listItems}
         </div>
       )
@@ -74,30 +85,51 @@ function renderFormattedMessage(content = '') {
     // Cek apakah baris adalah item daftar bullet (- , * , • ) atau nomor (1. )
     const bulletMatch = cleanLine.match(/^(?:[-*•]|\d+\.)\s+(.*)$/)
     if (bulletMatch) {
-      const itemText = bulletMatch[1].trim()
-      // Cek apakah formatnya "Kategori: Rp xxx" agar bisa ditata rapi
+      const itemText = bulletMatch[1].replace(/\*\*/g, '').trim()
+      // Cek apakah formatnya "Kategori: Rp xxx" agar bisa ditata rapi sebagai kartu
       const kvMatch = itemText.match(/^([^:]{2,45}):\s*(Rp\s?[\d.,]+.*)$/i)
       if (kvMatch) {
         const labelClean = kvMatch[1].replace(/\*/g, '').trim()
         const valueClean = kvMatch[2].replace(/\*/g, '').trim()
         listItems.push(
-          <div key={`item-${idx}`} className="ai-list-card">
-            <span className="ai-list-label">{renderInlineText(labelClean)}</span>
-            <span className="ai-list-value">{renderInlineText(valueClean)}</span>
+          <div
+            key={`item-${idx}`}
+            className="ai-list-card"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              padding: '7px 10px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              background: 'rgba(148, 163, 184, 0.08)',
+              fontSize: '0.8rem',
+              lineHeight: 1.35
+            }}
+          >
+            <span className="ai-list-label" style={{ fontWeight: 500 }}>{renderInlineText(labelClean)}</span>
+            <span className="ai-list-value" style={{ whiteSpace: 'nowrap', fontWeight: 700, flexShrink: 0 }}>
+              {renderInlineText(valueClean)}
+            </span>
           </div>
         )
       } else {
         listItems.push(
-          <div key={`item-${idx}`} className="ai-list-item">
-            <span className="ai-list-bullet">•</span>
-            <span className="ai-list-text">{renderInlineText(itemText)}</span>
+          <div
+            key={`item-${idx}`}
+            className="ai-list-item"
+            style={{ display: 'flex', alignItems: 'flex-start', gap: '7px', lineHeight: 1.45 }}
+          >
+            <span className="ai-list-bullet" style={{ color: 'var(--color-primary-500)', fontWeight: 700, flexShrink: 0 }}>•</span>
+            <span className="ai-list-text" style={{ flex: 1 }}>{renderInlineText(itemText)}</span>
           </div>
         )
       }
     } else {
       flushList(idx)
       elements.push(
-        <p key={`p-${idx}`} className="ai-paragraph">
+        <p key={`p-${idx}`} className="ai-paragraph" style={{ margin: 0, lineHeight: 1.55 }}>
           {renderInlineText(cleanLine)}
         </p>
       )
@@ -105,11 +137,16 @@ function renderFormattedMessage(content = '') {
   })
 
   flushList('end')
-  return <div className="ai-formatted-content">{elements}</div>
+  return (
+    <div className="ai-formatted-content" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {elements}
+    </div>
+  )
 }
 
 export default function AiChatWidget() {
   const { t } = useLanguage()
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [inputValue, setInputValue] = useState('')
@@ -185,6 +222,11 @@ export default function AiChatWidget() {
 
       // Tambahkan jawaban bot ke list
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
+
+      // Jika AI baru saja menambahkan transaksi ke database, refresh halaman agar tabel/dashboard terupdate
+      if (data.txCreated) {
+        router.refresh()
+      }
     } catch (err) {
       console.error(err)
       setErrorMsg(t('ai_error_general') || 'Gagal memproses pertanyaan Anda.')

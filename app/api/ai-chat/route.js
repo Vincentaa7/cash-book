@@ -4,6 +4,8 @@ import path from 'path'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
+import { syncBudgetsForTransactionChange } from '@/lib/cashbook'
 
 function cleanEnvValue(val = '') {
   return String(val)
@@ -186,12 +188,14 @@ export async function POST(request) {
       day: 'numeric'
     })
 
+    const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }) // YYYY-MM-DD
+
     // 6. Susun System Prompt AI
     const systemPrompt = `Anda adalah "Asisten AI Keuangan", asisten keuangan pribadi yang hangat, ramah, cerdas, dan komunikatif untuk keluarga "${familyName}".
 Anda sedang mengobrol dengan "${session.name}" (Role: ${session.role}).
 
 === HARI INI ===
-${todayStr}
+${todayStr} (Tanggal ISO: ${todayIso})
 
 === ANGGOTA KELUARGA ===
 ${memberStr || 'Belum ada anggota keluarga.'}
@@ -206,20 +210,30 @@ ${monthlySummaryStr || 'Belum ada rekap bulanan.'}
 ${snapshotStr || 'Tidak ada arsip lama.'}
 
 === ${recentTx.length} TRANSAKSI TERBARU (DARI TOTAL ${transactions.length} TRANSAKSI) ===
-Format: - YYYY-MM-DD|Kategori|Nama Barang|Nominal Rupiah|Pencatat|Catatan
 ${txStr || 'Belum ada transaksi tercatat.'}
 
-=== PANDUAN GAYA BAHASA & PENATAAN JAWABAN ===
-1. Berbicaralah secara alami, hangat, dan manusiawi seperti penasihat keuangan keluarga yang akrab dan sopan. Jangan kaku seperti robot.
-2. Susun jawaban dengan tata letak yang bersih dan mudah dipindai mata:
-   - Paragraf Pembuka: Langsung jawab inti pertanyaan dengan kalimat yang ramah dan jelas.
-   - Rincian Poin (jika ada): Gunakan daftar poin sederhana dengan tanda strip "- " (satu item per baris, urutkan dari pengeluaran terbesar ke terkecil). Contoh:
-     - 🛒 Sembako & Kebutuhan Dapur: Rp 2.869.000
-     - 🍽️ Makanan & Minuman: Rp 1.884.000
-   - Paragraf Penutup: Berikan 1 kalimat kesimpulan singkat atau insight ringan yang bermanfaat.
-3. DILARANG menggunakan simbol Markdown yang berantakan seperti tanda pagar heading (###), tabel garis (|---|), garis pemisah (---), atau tanda bintang berlebihan.
-4. Selalu tulis nominal uang dalam format Rupiah yang rapi (contoh: Rp 2.869.000) dan jawab 100% akurat sesuai data di atas.
-5. Balas menggunakan bahasa yang sama dengan pertanyaan pengguna (Indonesia / Inggris / Belanda).`
+=== ATURAN WAJIB GAYA BAHASA & TATA LETAK (SANGAT PENTING) ===
+1. DILARANG KERAS menggunakan simbol bintang (** atau *), tanda pagar (###), garis tabel (|---|), atau kode format kaku di dalam jawaban Anda. Tulis teks bersih tanpa tanda bintang sama sekali!
+2. Gunakan bahasa percakapan manusia yang hangat, sopan, ringkas, dan enak dibaca di layar HP/chat sempit.
+3. Susun jawaban menjadi maksimal 2-3 bagian pendek yang dipisahkan 1 baris kosong:
+   - Kalimat pembuka yang ramah & langsung menjawab inti pertanyaan.
+   - Daftar poin singkat menggunakan tanda "• " (satu poin per baris, singkat & padat, jangan menaruh daftar panjang di dalam tanda kurung).
+   - Kalimat penutup singkat yang ramah.
+4. JIKA PENGGUNA BERTANYA APAKAH BISA MENCATAT/MEMBUAT PENGELUARAN ATAU TRANSAKSI:
+   - Jawab dengan ramah bahwa Anda BISA mencatatnya langsung.
+   - JANGAN meminta format kaku seperti "YYYY-MM-DD" atau daftar kolom teknis (Tanggal, Kategori, Deskripsi, Nominal, Catatan).
+   - Cukup beritahu pengguna untuk mengetik santai nama pengeluaran dan nominalnya, lalu beri 3 contoh pendek seperti:
+     • Beli beras 5kg: Rp 75.000
+     • Bayar listrik: Rp 350.000
+     • Makan siang: Rp 45.000
+   - Sampaikan bahwa tanggal otomatis memakai hari ini dan kategorinya akan Anda pilihkan otomatis.
+5. JIKA PENGGUNA MEMINTA MENCATAT TRANSAKSI BARU DAN SUDAH MENYEBUTKAN NAMA BARANG + NOMINAL:
+   - Konfirmasi dengan ramah bahwa transaksi sudah dicatat beserta rincian singkatnya.
+   - WAJIB tambahkan tag tersembunyi ini di baris paling bawah jawaban Anda (sistem akan otomatis menyimpannya ke database dan menyembunyikan tag ini dari layar pengguna):
+     [[ADD_TX:YYYY-MM-DD|kode_kategori|Nama Barang|NominalAngkaMurni|CatatanOpsional]]
+     Pilihan kode_kategori valid: sembako, makan, tagihan, transportasi, kesehatan, pendidikan, hiburan, pakaian, rumah_tangga, sosial, tabungan, lainnya, pemasukan.
+     Contoh: [[ADD_TX:${todayIso}|sembako|Beras 5kg|75000|]]
+6. Balas menggunakan bahasa yang sama dengan pertanyaan pengguna (Indonesia / Inggris / Belanda).`
 
     const limitedMessages = messages.slice(-6)
 
@@ -250,9 +264,15 @@ ${txStr || 'Belum ada transaksi tercatat.'}
     const cleanBotText = (text = '') => {
       return text
         .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/\[\[ADD_TX:[^\]]*\]\]/gi, '') // Sembunyikan tag aksi database dari teks chat
+        .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-') // Normalisasi semua jenis strip Unicode (seperti ‑ dari gpt-oss)
         .replace(/^#{1,6}\s+/gm, '') // Hapus simbol ### di awal baris
         .replace(/^\s*[-*_]{3,}\s*$/gm, '') // Hapus garis --- atau ***
-        .replace(/^\s*\*\s+/gm, '- ') // Seragamkan bullet * menjadi -
+        .replace(/\*\*([^*]+)\*\*/g, '$1') // Hapus simbol **tebal** langsung dari server agar tidak pernah bocor
+        .replace(/\*([^*\n]+)\*/g, '$1') // Hapus simbol *miring*
+        .replace(/\*\*/g, '') // Bersihkan sisa ** liar
+        .replace(/`/g, '') // Hapus backtick
+        .replace(/^\s*[-*•]\s+/gm, '• ') // Seragamkan semua daftar poin menjadi "• "
         .replace(/\n{3,}/g, '\n\n') // Rapikan jarak antar paragraf
         .trim()
     }
@@ -269,7 +289,7 @@ ${txStr || 'Belum ada transaksi tercatat.'}
         body: JSON.stringify({
           model: candidateModel,
           messages: payloadMessages,
-          temperature: 0.35,
+          temperature: 0.3,
           max_tokens: 1024
         })
       })
@@ -277,9 +297,62 @@ ${txStr || 'Belum ada transaksi tercatat.'}
       if (groqResponse.ok) {
         const groqData = await groqResponse.json()
         const rawReply = groqData.choices?.[0]?.message?.content || ''
+
+        // Cek apakah AI mengeksekusi perintah tambah transaksi [[ADD_TX:...]]
+        let txCreated = false
+        const txMatches = [...rawReply.matchAll(/\[\[ADD_TX:([^\]]+)\]\]/gi)]
+        for (const match of txMatches) {
+          try {
+            const parts = match[1].split('|').map(s => s.trim())
+            const [rawDate, rawCat, rawItem, rawAmt, rawNotes] = parts
+            const cleanAmt = parseInt(String(rawAmt || '').replace(/[^\d]/g, ''), 10)
+            const validCat = CATEGORY_LABELS[rawCat] ? rawCat : 'lainnya'
+            const validDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayIso
+
+            if (rawItem && cleanAmt > 0) {
+              const newTx = await prisma.transaction.create({
+                data: {
+                  familyId,
+                  itemName: rawItem,
+                  amount: BigInt(cleanAmt),
+                  category: validCat,
+                  transactionDate: new Date(validDate),
+                  notes: rawNotes || 'Dicatat via Asisten AI',
+                  memberId: session.id,
+                }
+              })
+              const adjustedMonths = await syncBudgetsForTransactionChange(null, newTx)
+              const txDateObj = new Date(validDate)
+              const remainingBalance = await getMonthRemainingBalance(
+                txDateObj.getUTCMonth() + 1,
+                txDateObj.getUTCFullYear(),
+                familyId
+              )
+              await logActivity({
+                action: 'TRANSACTION_CREATE',
+                description: `${session.name} mencatat transaksi "${rawItem}" sebesar ${formatRupiah(cleanAmt)} via Asisten AI`,
+                details: {
+                  id: newTx.id,
+                  itemName: rawItem,
+                  amount: cleanAmt,
+                  category: validCat,
+                  transactionDate: validDate,
+                  remainingBalance,
+                  adjustedMonths
+                },
+                memberId: session.id,
+                familyId
+              })
+              txCreated = true
+            }
+          } catch (txErr) {
+            console.error('[AI ADD_TX ERROR]', txErr)
+          }
+        }
+
         const botReply = cleanBotText(rawReply)
         if (botReply) {
-          return NextResponse.json({ reply: botReply, modelUsed: candidateModel })
+          return NextResponse.json({ reply: botReply, modelUsed: candidateModel, txCreated })
         }
       }
 
