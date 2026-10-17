@@ -5,6 +5,109 @@ import { useState, useEffect, useRef } from 'react'
 import { X, Send, Bot, AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/components/LanguageContext'
 
+// Helper memformat teks inline: mengubah **tebal** menjadi <strong>, menghapus simbol * liar, dan mengunci nominal Rp agar tidak terpotong baris
+function renderInlineText(text = '') {
+  if (!text) return null
+  // Bersihkan simbol markdown liar seperti *** atau `
+  const cleaned = String(text)
+    .replace(/\*{3,}/g, '**')
+    .replace(/`/g, '')
+
+  // Pisahkan bagian **bold** dan nominal Rp 123.456
+  const tokenRegex = /(\*\*[^*]+\*\*|Rp\s?[\d.,]+(?:\s?(?:juta|ribu|miliar|jt|rb))?)/gi
+  const parts = cleaned.split(tokenRegex)
+
+  return parts.map((part, i) => {
+    if (!part) return null
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      const inner = part.slice(2, -2).replace(/\*/g, '').trim()
+      // Jika di dalam bold adalah nominal Rp, jaga agar tetap nowrap
+      if (/^Rp\s?[\d.,]+/i.test(inner)) {
+        return <strong key={i} className="ai-currency">{inner}</strong>
+      }
+      return <strong key={i} className="ai-bold">{inner}</strong>
+    }
+    if (/^Rp\s?[\d.,]+/i.test(part)) {
+      return <span key={i} className="ai-currency">{part.replace(/\s+/g, '\u00A0')}</span>
+    }
+    // Hapus sisa tanda bintang tunggal yang tidak berpasangan
+    return part.replace(/\*/g, '')
+  })
+}
+
+// Helper merapikan seluruh isi pesan AI menjadi paragraf & daftar poin yang terstruktur rapi
+function renderFormattedMessage(content = '') {
+  if (!content) return null
+  const lines = String(content)
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+
+  const elements = []
+  let listItems = []
+
+  const flushList = (keyPrefix) => {
+    if (listItems.length > 0) {
+      elements.push(
+        <div key={`list-${keyPrefix}`} className="ai-list-group">
+          {listItems}
+        </div>
+      )
+      listItems = []
+    }
+  }
+
+  lines.forEach((rawLine, idx) => {
+    const line = rawLine.trim()
+    if (!line) {
+      flushList(idx)
+      return
+    }
+
+    // Abaikan baris yang hanya berisi simbol pemisah --- atau ===
+    if (/^[-=*_]{3,}$/.test(line)) {
+      return
+    }
+
+    // Bersihkan heading markdown ### jika masih ada
+    const cleanLine = line.replace(/^#{1,6}\s+/, '')
+
+    // Cek apakah baris adalah item daftar bullet (- , * , • ) atau nomor (1. )
+    const bulletMatch = cleanLine.match(/^(?:[-*•]|\d+\.)\s+(.*)$/)
+    if (bulletMatch) {
+      const itemText = bulletMatch[1].trim()
+      // Cek apakah formatnya "Kategori: Rp xxx" agar bisa ditata rapi
+      const kvMatch = itemText.match(/^([^:]{2,45}):\s*(Rp\s?[\d.,]+.*)$/i)
+      if (kvMatch) {
+        const labelClean = kvMatch[1].replace(/\*/g, '').trim()
+        const valueClean = kvMatch[2].replace(/\*/g, '').trim()
+        listItems.push(
+          <div key={`item-${idx}`} className="ai-list-card">
+            <span className="ai-list-label">{renderInlineText(labelClean)}</span>
+            <span className="ai-list-value">{renderInlineText(valueClean)}</span>
+          </div>
+        )
+      } else {
+        listItems.push(
+          <div key={`item-${idx}`} className="ai-list-item">
+            <span className="ai-list-bullet">•</span>
+            <span className="ai-list-text">{renderInlineText(itemText)}</span>
+          </div>
+        )
+      }
+    } else {
+      flushList(idx)
+      elements.push(
+        <p key={`p-${idx}`} className="ai-paragraph">
+          {renderInlineText(cleanLine)}
+        </p>
+      )
+    }
+  })
+
+  flushList('end')
+  return <div className="ai-formatted-content">{elements}</div>
+}
+
 export default function AiChatWidget() {
   const { t } = useLanguage()
   const [isOpen, setIsOpen] = useState(false)
@@ -159,7 +262,7 @@ export default function AiChatWidget() {
                   <div className="ai-message-avatar">🤖</div>
                 )}
                 <div className="ai-message-bubble">
-                  {msg.content}
+                  {msg.role === 'assistant' ? renderFormattedMessage(msg.content) : msg.content}
                 </div>
               </div>
             ))}

@@ -1804,7 +1804,7 @@ img { max-width: 100%; display: block; }
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  max-width: 85%;
+  max-width: 88%;
   animation: fadeInUp 0.2s ease forwards;
 }
 
@@ -1815,6 +1815,8 @@ img { max-width: 100%; display: block; }
 
 .ai-message-row.assistant {
   align-self: flex-start;
+  align-items: flex-start;
+  max-width: 92%;
 }
 
 .ai-message-avatar {
@@ -1829,6 +1831,7 @@ img { max-width: 100%; display: block; }
   justify-content: center;
   font-size: 0.85rem;
   flex-shrink: 0;
+  margin-top: 2px;
 }
 
 [data-theme="dark"] .ai-message-avatar {
@@ -1838,10 +1841,9 @@ img { max-width: 100%; display: block; }
 }
 
 .ai-message-bubble {
-  padding: 10px 14px;
-  font-size: 0.85rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
+  padding: 11px 14px;
+  font-size: 0.84rem;
+  line-height: 1.55;
   word-break: break-word;
 }
 
@@ -1850,14 +1852,94 @@ img { max-width: 100%; display: block; }
   color: white;
   border-radius: 16px 16px 2px 16px;
   box-shadow: 0 2px 4px rgba(13, 148, 136, 0.15);
+  white-space: pre-wrap;
 }
 
 .ai-message-row.assistant .ai-message-bubble {
   background: var(--bg-secondary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-radius: 16px 16px 16px 2px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  border-radius: 4px 16px 16px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  white-space: normal;
+}
+
+/* Rich Formatted Assistant Message Content */
+.ai-formatted-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-paragraph {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.ai-bold {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ai-currency {
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--color-primary-600);
+}
+
+[data-theme="dark"] .ai-currency {
+  color: var(--color-primary-400);
+}
+
+.ai-list-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 2px 0;
+}
+
+.ai-list-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--bg-tertiary, rgba(148, 163, 184, 0.08));
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.ai-list-label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ai-list-value {
+  white-space: nowrap;
+  font-weight: 700;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.ai-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding-left: 2px;
+  line-height: 1.45;
+}
+
+.ai-list-bullet {
+  color: var(--color-primary-500);
+  font-weight: 700;
+  line-height: 1.45;
+  flex-shrink: 0;
+}
+
+.ai-list-text {
+  flex: 1;
 }
 
 /* Loading bubble (dots jumping) */
