@@ -29,7 +29,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'api_key_missing' }, { status: 400 })
     }
 
-    const groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+    const groqModel = process.env.GROQ_MODEL || 'openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b'
 
     // 3. Ambil Pesan dari Request Body
     const { messages } = await request.json()
@@ -152,31 +152,61 @@ ${txStr || 'Belum ada transaksi tercatat.'}
       ...limitedMessages
     ]
 
-    // 8. Kirim Request ke API Groq Cloud (OpenAI-compatible)
-    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: groqModel,
-        messages: payloadMessages,
-        temperature: 0.3,
-        max_tokens: 1000
-      })
-    })
+    // 8. Daftar model Groq (mendukung multi-model fallback otomatis jika kuota model utama habis)
+    // Di Groq Free Tier, setiap model punya jatah kuota token harian/menit masing-masing!
+    const configuredModels = groqModel
+      .split(',')
+      .map(m => m.trim())
+      .filter(Boolean)
 
-    if (!groqResponse.ok) {
+    const fallbackPool = [
+      'openai/gpt-oss-120b',
+      'qwen/qwen3.8-27b',
+      'openai/gpt-oss-20b',
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+    ]
+
+    const modelCandidates = [
+      ...configuredModels,
+      ...fallbackPool.filter(m => !configuredModels.includes(m)),
+    ]
+
+    let lastStatus = 500
+    for (const candidateModel of modelCandidates) {
+      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: candidateModel,
+          messages: payloadMessages,
+          temperature: 0.3,
+          max_tokens: 2048
+        })
+      })
+
+      if (groqResponse.ok) {
+        const groqData = await groqResponse.json()
+        const rawReply = groqData.choices?.[0]?.message?.content || ''
+        // Bersihkan tag <think>...</think> jika model reasoning menyertakannya
+        const botReply = rawReply.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+        if (botReply) {
+          return NextResponse.json({ reply: botReply, modelUsed: candidateModel })
+        }
+      }
+
+      lastStatus = groqResponse.status
       const errorText = await groqResponse.text()
-      console.error('[GROQ API ERROR RESPONSE]', errorText)
-      return NextResponse.json({ error: 'Gagal menghubungi server Groq AI' }, { status: groqResponse.status })
+      console.warn(`[GROQ FALLBACK] Model ${candidateModel} gagal (${lastStatus}):`, errorText)
+
+      // Jika error adalah 401 (API Key salah), langsung hentikan tanpa coba model lain
+      if (lastStatus === 401) break
     }
 
-    const groqData = await groqResponse.json()
-    const botReply = groqData.choices?.[0]?.message?.content || ''
-
-    return NextResponse.json({ reply: botReply })
+    return NextResponse.json({ error: 'Gagal menghubungi server Groq AI' }, { status: lastStatus })
   } catch (error) {
     console.error('[AI CHAT API ERROR]', error)
     return NextResponse.json({ error: 'Terjadi kesalahan internal pada server' }, { status: 500 })

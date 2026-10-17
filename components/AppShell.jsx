@@ -197,17 +197,25 @@ export default function AppShell({ children }) {
               <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>{t('system_version')}</span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 5 }}>
-            <Link href="/kalender" className="btn-icon" title={t('calendar')}>
-              <Calendar size={18} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Link
+              href="/kalender"
+              className={`btn-icon${pathname.startsWith('/kalender') ? ' text-primary' : ''}`}
+              title={t('calendar')}
+            >
+              <Calendar size={18} style={pathname.startsWith('/kalender') ? { color: 'var(--color-primary-500)' } : {}} />
             </Link>
-            <Link href="/pribadi" className={`btn-icon${pathname.startsWith('/pribadi') ? ' text-primary' : ''}`} title={t('personal_ledger')}>
+            <Link
+              href="/pribadi"
+              className={`btn-icon${pathname.startsWith('/pribadi') ? ' text-primary' : ''}`}
+              title={t('personal_ledger')}
+            >
               <BookOpen size={18} style={pathname.startsWith('/pribadi') ? { color: 'var(--color-primary-500)' } : {}} />
             </Link>
-            <button onClick={toggleTheme} className="btn-icon">
+            <button type="button" onClick={toggleTheme} className="btn-icon" title={theme === 'light' ? t('dark_mode') : t('light_mode')}>
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <button onClick={handleLogout} className="btn-icon">
+            <button type="button" onClick={handleLogout} className="btn-icon" title="Keluar">
               <LogOut size={18} />
             </button>
           </div>

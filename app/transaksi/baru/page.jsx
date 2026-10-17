@@ -37,7 +37,7 @@ export default function NewTransactionPage() {
       try {
         const [budgetRes, dashRes] = await Promise.all([
           fetch(`/api/budget?month=${now.getMonth() + 1}&year=${now.getFullYear()}`),
-          fetch(`/api/dashboard?month=${now.getMonth() + 1}&year=${now.getFullYear()}`),
+          fetch(`/api/dashboard?month=${now.getMonth() + 1}&year=${now.getFullYear()}&summaryOnly=true`),
         ])
         const budgetData = await budgetRes.json()
         const dashData = await dashRes.json()
@@ -138,9 +138,12 @@ export default function NewTransactionPage() {
         <div style={{ maxWidth: 640, margin: '0 auto' }}>
           {/* Info sisa kas */}
           {budget && (
-            <div className={`alert ${remaining <= 0 ? 'alert-danger' : remaining / budget.amount < 0.2 ? 'alert-warning' : 'alert-info'}`} style={{ marginBottom: 20 }}>
-              <span>💰</span>
-              <span>
+            <div
+              className={`alert ${remaining <= 0 ? 'alert-danger' : remaining / budget.amount < 0.2 ? 'alert-warning' : 'alert-info'}`}
+              style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}
+            >
+              <span style={{ flex: '0 0 auto', fontSize: '1.15rem', lineHeight: 1 }}>💰</span>
+              <span style={{ flex: 1 }}>
                 {t('total_expense')}: <strong>{formatRupiah(remaining)}</strong>
                 {remaining <= 0 && ` — ${t('no_transactions')}`}
               </span>

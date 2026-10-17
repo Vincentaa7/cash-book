@@ -856,12 +856,26 @@ img { max-width: 100%; display: block; }
 }
 
 .btn-icon {
-  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border-radius: var(--border-radius-sm);
   background: transparent;
   border: none;
   color: var(--text-secondary);
   transition: var(--transition);
+  line-height: 1;
+  vertical-align: middle;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.btn-icon svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .btn-icon:hover {
@@ -963,7 +977,7 @@ img { max-width: 100%; display: block; }
   border-radius: var(--border-radius-sm);
   font-size: 0.875rem;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   margin-bottom: 16px;
   word-break: break-word;
@@ -974,10 +988,17 @@ img { max-width: 100%; display: block; }
 
 .alert svg {
   flex-shrink: 0;
-  margin-top: 2px;
 }
 
-.alert > span, .alert > p {
+/* Jika elemen pertama adalah span ikon/emoji (bukan satu-satunya elemen), jangan beri flex: 1 */
+.alert > span:first-child:not(:only-child) {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.alert > span:last-child,
+.alert > p {
   flex: 1;
   min-width: 0;
   line-height: 1.5;
