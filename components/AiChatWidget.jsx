@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, Send, Bot, AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/components/LanguageContext'
+import { invalidateCache } from '@/lib/clientCache'
 
 // Helper memformat teks inline: mengubah **tebal** menjadi <strong>, menghapus simbol * liar, dan mengunci nominal Rp agar tidak terpotong baris
 function renderInlineText(text = '') {
@@ -223,8 +224,9 @@ export default function AiChatWidget() {
       // Tambahkan jawaban bot ke list
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
 
-      // Jika AI baru saja menambahkan transaksi ke database, refresh halaman agar tabel/dashboard terupdate
+      // Jika AI baru saja menambahkan transaksi ke database, bersihkan cache & refresh halaman agar tabel/dashboard terupdate
       if (data.txCreated) {
+        invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
         router.refresh()
       }
     } catch (err) {

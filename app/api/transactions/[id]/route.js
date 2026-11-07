@@ -35,61 +35,73 @@ export async function PUT(request, { params }) {
     }
 
     const { itemName, amount, category, transactionDate, notes } = await request.json()
-
-    const updated = await prisma.transaction.update({
-      where: { id },
-      data: {
-        itemName,
-        amount: BigInt(amount),
-        category,
-        transactionDate: new Date(transactionDate),
-        notes: notes || null,
-        editedById: session.id,
-        editedByName: session.name,
-      },
-      include: {
-        member: { select: { id: true, name: true, avatarColor: true } },
-      },
-    })
-
-    // Sinkronkan kas: batalkan efek lama, terapkan efek baru (termasuk top-up
-    // yang nominal/tanggal/kategorinya diubah) dan teruskan ke bulan-bulan berikutnya
-    const adjustedMonths = await syncBudgetsForTransactionChange(transaction, updated)
-
-    // Hitung sisa saldo setelah transaksi diubah
+    const numericAmount = Number(amount)
     const txDate = new Date(transactionDate)
+
+    // Jalankan update transaksi & sinkronisasi kas secara paralel
+    const [updated, adjustedMonths] = await Promise.all([
+      prisma.transaction.update({
+        where: { id },
+        data: {
+          itemName,
+          amount: BigInt(numericAmount),
+          category,
+          transactionDate: txDate,
+          notes: notes || null,
+          editedById: session.id,
+          editedByName: session.name,
+        },
+        include: {
+          member: { select: { id: true, name: true, avatarColor: true } },
+        },
+      }),
+      syncBudgetsForTransactionChange(transaction, {
+        familyId,
+        amount: numericAmount,
+        category,
+        transactionDate: txDate,
+      }),
+    ])
+
+    // Hitung sisa saldo & catat log aktivitas di background tanpa menahan respons UI
     const txMonth = txDate.getUTCMonth() + 1
     const txYear = txDate.getUTCFullYear()
-    const remainingBalance = await getMonthRemainingBalance(txMonth, txYear, familyId)
-    const balanceText = (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
-      (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
+    void (async () => {
+      try {
+        const remainingBalance = await getMonthRemainingBalance(txMonth, txYear, familyId)
+        const balanceText =
+          (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
+          (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
-    // Catat log aktivitas edit
-    await logActivity({
-      action: 'TRANSACTION_UPDATE',
-      description: `${session.name} mengubah transaksi "${transaction.itemName}" (${formatRupiah(transaction.amount)}) menjadi "${itemName}" (${formatRupiah(amount)})${balanceText}`,
-      details: {
-        id,
-        old: {
-          itemName: transaction.itemName,
-          amount: Number(transaction.amount),
-          category: transaction.category,
-          transactionDate: transaction.transactionDate.toISOString().split('T')[0],
-          notes: transaction.notes,
-        },
-        new: {
-          itemName,
-          amount,
-          category,
-          transactionDate,
-          notes,
-        },
-        remainingBalance,
-        adjustedMonths,
-      },
-      memberId: session.id,
-      familyId,
-    })
+        await logActivity({
+          action: 'TRANSACTION_UPDATE',
+          description: `${session.name} mengubah transaksi "${transaction.itemName}" (${formatRupiah(transaction.amount)}) menjadi "${itemName}" (${formatRupiah(numericAmount)})${balanceText}`,
+          details: {
+            id,
+            old: {
+              itemName: transaction.itemName,
+              amount: Number(transaction.amount),
+              category: transaction.category,
+              transactionDate: transaction.transactionDate.toISOString().split('T')[0],
+              notes: transaction.notes,
+            },
+            new: {
+              itemName,
+              amount: numericAmount,
+              category,
+              transactionDate,
+              notes,
+            },
+            remainingBalance,
+            adjustedMonths,
+          },
+          memberId: session.id,
+          familyId,
+        })
+      } catch (err) {
+        console.error('Background logActivity update error:', err)
+      }
+    })()
 
     return NextResponse.json({
       transaction: { ...updated, amount: Number(updated.amount) },
@@ -117,42 +129,43 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Transaksi tidak ditemukan' }, { status: 404 })
     }
 
-    // Hapus transaksi dari database
-    await prisma.transaction.delete({ where: { id } })
+    // Hapus transaksi & sinkronkan kas secara paralel
+    const [, adjustedMonths] = await Promise.all([
+      prisma.transaction.delete({ where: { id } }),
+      syncBudgetsForTransactionChange(transaction, null),
+    ])
 
-    // ─────────────────────────────────────────────────────────────────
-    // Sinkronkan kas: jika yang dihapus adalah top-up (pemasukan), kas
-    // bulan itu dikurangi kembali. Jika transaksi bulan lampau, perubahan
-    // sisa saldo diteruskan ke kas bulan-bulan berikutnya.
-    // (Tidak lagi dibatasi minimal 0 agar selisih tidak "hilang".)
-    // ─────────────────────────────────────────────────────────────────
-    const adjustedMonths = await syncBudgetsForTransactionChange(transaction, null)
-
-    // Hitung sisa saldo setelah transaksi dihapus
+    // Hitung sisa saldo & catat log aktivitas hapus di background
     const delDate = new Date(transaction.transactionDate)
     const delMonth = delDate.getUTCMonth() + 1
     const delYear = delDate.getUTCFullYear()
-    const remainingBalance = await getMonthRemainingBalance(delMonth, delYear, familyId)
-    const balanceText = (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
-      (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
+    void (async () => {
+      try {
+        const remainingBalance = await getMonthRemainingBalance(delMonth, delYear, familyId)
+        const balanceText =
+          (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
+          (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
-    // Catat log aktivitas hapus
-    await logActivity({
-      action: 'TRANSACTION_DELETE',
-      description: `${session.name} menghapus transaksi "${transaction.itemName}" sebesar ${formatRupiah(transaction.amount)}${balanceText}`,
-      details: {
-        id,
-        itemName: transaction.itemName,
-        amount: Number(transaction.amount),
-        category: transaction.category,
-        transactionDate: transaction.transactionDate.toISOString().split('T')[0],
-        notes: transaction.notes,
-        remainingBalance,
-        adjustedMonths,
-      },
-      memberId: session.id,
-      familyId,
-    })
+        await logActivity({
+          action: 'TRANSACTION_DELETE',
+          description: `${session.name} menghapus transaksi "${transaction.itemName}" sebesar ${formatRupiah(transaction.amount)}${balanceText}`,
+          details: {
+            id,
+            itemName: transaction.itemName,
+            amount: Number(transaction.amount),
+            category: transaction.category,
+            transactionDate: transaction.transactionDate.toISOString().split('T')[0],
+            notes: transaction.notes,
+            remainingBalance,
+            adjustedMonths,
+          },
+          memberId: session.id,
+          familyId,
+        })
+      } catch (err) {
+        console.error('Background logActivity delete error:', err)
+      }
+    })()
 
     return NextResponse.json({ success: true })
   } catch (error) {

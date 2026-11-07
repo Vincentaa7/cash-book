@@ -6,6 +6,7 @@ import AppShell from '@/components/AppShell'
 import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import { formatRupiah, formatNumber, formatDate, formatDateInput } from '@/lib/format'
+import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
 import {
   Plus, Edit2, Trash2, TrendingUp, TrendingDown,
   Wallet, X, ChevronLeft, ChevronRight, Lock,
@@ -44,10 +45,12 @@ export default function PribadiPage() {
   const now = new Date()
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
   const [selectedYear, setSelectedYear]   = useState(now.getFullYear())
+  const initPersonalUrl = `/api/personal?page=1&limit=15&month=${now.getMonth() + 1}&year=${now.getFullYear()}`
+  const initPersonalCache = peekCache(initPersonalUrl)
 
   // Data State
-  const [items, setItems]         = useState([])
-  const [summary, setSummary]     = useState({
+  const [items, setItems]         = useState(() => initPersonalCache?.items || [])
+  const [summary, setSummary]     = useState(() => initPersonalCache?.summary || {
     budgetAmount: 0,
     totalIncome: 0,
     totalExpense: 0,
@@ -55,10 +58,10 @@ export default function PribadiPage() {
     usagePercent: 0,
     hasBudget: false,
   })
-  const [total, setTotal]         = useState(0)
+  const [total, setTotal]         = useState(() => initPersonalCache?.total || 0)
   const [page, setPage]           = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [loading, setLoading]     = useState(true)
+  const [totalPages, setTotalPages] = useState(() => initPersonalCache?.totalPages || 1)
+  const [loading, setLoading]     = useState(() => !initPersonalCache)
 
   // Filters
   const [filterType, setFilterType]         = useState('')
@@ -85,18 +88,29 @@ export default function PribadiPage() {
   const [msg, setMsg]                         = useState(null) // { type: 'success'|'error', text }
 
   // Fetch transactions & summary for selected period
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const fetchData = useCallback(async (forceRefresh = false) => {
+    const params = new URLSearchParams({
+      page, limit: 15,
+      month: selectedMonth,
+      year:  selectedYear,
+      ...(filterType     && { type: filterType }),
+      ...(filterCategory && { category: filterCategory }),
+    })
+    const url = `/api/personal?${params}`
+    const cached = !forceRefresh ? peekCache(url) : null
+
+    if (cached) {
+      setItems(cached.items || [])
+      setTotal(cached.total || 0)
+      setTotalPages(cached.totalPages || 1)
+      if (cached.summary) setSummary(cached.summary)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+
     try {
-      const params = new URLSearchParams({
-        page, limit: 15,
-        month: selectedMonth,
-        year:  selectedYear,
-        ...(filterType     && { type: filterType }),
-        ...(filterCategory && { category: filterCategory }),
-      })
-      const res  = await fetch(`/api/personal?${params}`)
-      const data = await res.json()
+      const data = await cachedFetch(url, { ttlMs: 30000, forceRefresh })
       setItems(data.items || [])
       setTotal(data.total || 0)
       setTotalPages(data.totalPages || 1)
@@ -194,7 +208,8 @@ export default function PribadiPage() {
       })
       if (res.ok) {
         setShowTxModal(false)
-        fetchData()
+        invalidateCache('/api/personal')
+        fetchData(true)
         showMsg('success', editItem ? '✅ Catatan berhasil diperbarui!' : '✅ Transaksi berhasil dicatat!')
       } else {
         const d = await res.json()
@@ -225,7 +240,8 @@ export default function PribadiPage() {
       })
       if (res.ok) {
         setShowBudgetModal(false)
-        fetchData()
+        invalidateCache('/api/personal')
+        fetchData(true)
         showMsg('success', '💰 Saldo utama kas pribadi berhasil diatur!')
       } else {
         const d = await res.json()
@@ -257,7 +273,8 @@ export default function PribadiPage() {
       })
       if (res.ok) {
         setShowTopupModal(false)
-        fetchData()
+        invalidateCache('/api/personal')
+        fetchData(true)
         showMsg('success', '➕ Saldo kas pribadi berhasil ditambah (Top-up)!')
       } else {
         const d = await res.json()
@@ -276,7 +293,8 @@ export default function PribadiPage() {
       const res = await fetch(`/api/personal/${deleteItem.id}`, { method: 'DELETE' })
       if (res.ok) {
         setDeleteItem(null)
-        fetchData()
+        invalidateCache('/api/personal')
+        fetchData(true)
         showMsg('success', '🗑️ Catatan berhasil dihapus!')
       }
     } catch {}

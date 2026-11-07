@@ -65,7 +65,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Data kas tidak valid' }, { status: 400 })
     }
 
-    let budget;
+    let budget
     if (action === 'add') {
       // Periksa apakah budget sudah ada sebelum increment
       const existing = await prisma.monthlyBudget.findUnique({
@@ -76,47 +76,50 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Harus mengatur kas utama terlebih dahulu' }, { status: 400 })
       }
 
-      budget = await prisma.monthlyBudget.update({
-        where: { uq_month_year: { familyId, month: parsedMonth, year: parsedYear } },
-        data: {
-          amount: { increment: parsedAmount },
-          createdBy: session.id,
-        },
-      })
-
-      // Tambah transaksi kas masuk ke riwayat.
-      // Tanggal dibuat sebagai tanggal UTC murni (sesuai zona waktu WITA) agar
-      // top-up sebelum jam 08:00 tidak tercatat di tanggal/bulan sebelumnya.
       const today = getAppToday()
       let txDate = today.date
       if (today.month !== parsedMonth || today.year !== parsedYear) {
         txDate = new Date(Date.UTC(parsedYear, parsedMonth - 1, 1))
       }
 
-      await prisma.transaction.create({
-        data: {
-          familyId,
-          itemName: 'Tambah Kas (Top-up)',
-          amount: parsedAmount,
-          category: 'pemasukan',
-          transactionDate: txDate,
-          notes: `Penambahan saldo kas oleh ${session.name}`,
-          memberId: session.id,
+      // Jalankan update kas & insert transaksi top-up secara paralel (1 round-trip!)
+      ;[budget] = await Promise.all([
+        prisma.monthlyBudget.update({
+          where: { uq_month_year: { familyId, month: parsedMonth, year: parsedYear } },
+          data: {
+            amount: { increment: parsedAmount },
+            createdBy: session.id,
+          },
+        }),
+        prisma.transaction.create({
+          data: {
+            familyId,
+            itemName: 'Tambah Kas (Top-up)',
+            amount: parsedAmount,
+            category: 'pemasukan',
+            transactionDate: txDate,
+            notes: `Penambahan saldo kas oleh ${session.name}`,
+            memberId: session.id,
+          },
+        }),
+      ])
+
+      // Catat log aktivitas di background tanpa menahan respons ke pengguna
+      void (async () => {
+        try {
+          const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear, familyId)
+          const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+          await logActivity({
+            action: 'BUDGET_UPDATE',
+            description: `${session.name} menambah kas bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}${balanceText}`,
+            details: { month: parsedMonth, year: parsedYear, amount, action, total: Number(budget.amount), remainingBalance },
+            memberId: session.id,
+            familyId,
+          })
+        } catch (err) {
+          console.error('Background budget add log error:', err)
         }
-      })
-
-      // Hitung sisa saldo setelah kas ditambah
-      const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear, familyId)
-      const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
-
-      // Catat log aktivitas tambah kas
-      await logActivity({
-        action: 'BUDGET_UPDATE',
-        description: `${session.name} menambah kas bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}${balanceText}`,
-        details: { month: parsedMonth, year: parsedYear, amount, action, total: Number(budget.amount), remainingBalance },
-        memberId: session.id,
-        familyId,
-      })
+      })()
     } else {
       // Upsert: update jika ada, create jika belum
       budget = await prisma.monthlyBudget.upsert({
@@ -134,18 +137,22 @@ export async function POST(request) {
         },
       })
 
-      // Hitung sisa saldo setelah kas utama diatur
-      const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear, familyId)
-      const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
-
-      // Catat log aktivitas set kas utama
-      await logActivity({
-        action: 'BUDGET_UPDATE',
-        description: `${session.name} menetapkan kas utama bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}${balanceText}`,
-        details: { month: parsedMonth, year: parsedYear, amount, action, remainingBalance },
-        memberId: session.id,
-        familyId,
-      })
+      // Catat log aktivitas di background tanpa menahan respons ke pengguna
+      void (async () => {
+        try {
+          const remainingBalance = await getMonthRemainingBalance(parsedMonth, parsedYear, familyId)
+          const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+          await logActivity({
+            action: 'BUDGET_UPDATE',
+            description: `${session.name} menetapkan kas utama bulan ${parsedMonth}/${parsedYear} sebesar ${formatRupiah(amount)}${balanceText}`,
+            details: { month: parsedMonth, year: parsedYear, amount, action, remainingBalance },
+            memberId: session.id,
+            familyId,
+          })
+        } catch (err) {
+          console.error('Background budget set log error:', err)
+        }
+      })()
     }
 
     return NextResponse.json({

@@ -8,6 +8,7 @@ import { useUser } from '@/components/UserContext'
 import CategoryBadge from '@/components/CategoryBadge'
 import { formatRupiah, formatDate, formatMonthYear, calcPercentage, formatNumber } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo } from '@/lib/constants'
+import { cachedFetch, peekCache } from '@/lib/clientCache'
 import { Download, FileText, Filter, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
@@ -39,33 +40,47 @@ export default function LaporanPage() {
 
   const todayParts = getJakartaDateParts()
   const todayStr = formatJakartaYMD(todayParts.year, todayParts.month, todayParts.day)
+  const initStartStr = formatJakartaYMD(todayParts.year, todayParts.month, 1)
+  const initTxUrl = `/api/transactions?limit=500&startDate=${initStartStr}&endDate=${todayStr}`
 
-  const [startDate, setStartDate] = useState(formatJakartaYMD(todayParts.year, todayParts.month, 1))
+  const [startDate, setStartDate] = useState(initStartStr)
   const [endDate, setEndDate] = useState(todayStr)
   const [memberId, setMemberId] = useState('')
   const [category, setCategory] = useState('')
-  const [data, setData] = useState(null)
-  const [dashboardSummary, setDashboardSummary] = useState(null)
-  const [compareData, setCompareData] = useState(null)
-  const [members, setMembers] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [data, setData] = useState(() => peekCache(initTxUrl))
+  const [dashboardSummary, setDashboardSummary] = useState(
+    () =>
+      peekCache(`/api/dashboard?month=${todayParts.month}&year=${todayParts.year}&summaryOnly=true`)?.summary ||
+      peekCache(`/api/dashboard?month=${todayParts.month}&year=${todayParts.year}`)?.summary ||
+      null
+  )
+  const [compareData, setCompareData] = useState(() =>
+    peekCache(`/api/laporan/compare?month=${todayParts.month}&year=${todayParts.year}`)
+  )
+  const [members, setMembers] = useState(() => peekCache('/api/members')?.members || [])
+  const [loading, setLoading] = useState(() => !peekCache(initTxUrl))
 
   useEffect(() => {
-    fetch('/api/members').then(r => r.json()).then(d => setMembers(d.members || []))
+    cachedFetch('/api/members', { ttlMs: 60000 })
+      .then(d => setMembers(d.members || []))
+      .catch(() => {})
   }, [])
 
   async function fetchSummaryForMonth(m, y) {
     try {
-      const res = await fetch(`/api/dashboard?month=${m}&year=${y}&summaryOnly=true`)
-      const d = await res.json()
+      const fullDash = peekCache(`/api/dashboard?month=${m}&year=${y}`)
+      if (fullDash?.summary) {
+        setDashboardSummary(fullDash.summary)
+        return
+      }
+      const d = await cachedFetch(`/api/dashboard?month=${m}&year=${y}&summaryOnly=true`, { ttlMs: 30000 })
       setDashboardSummary(d.summary)
     } catch {}
   }
 
   async function fetchComparison(m, y) {
     try {
-      const res = await fetch(`/api/laporan/compare?month=${m}&year=${y}`)
-      const d = await res.json()
+      const d = await cachedFetch(`/api/laporan/compare?month=${m}&year=${y}`, { ttlMs: 30000 })
       setCompareData(d)
     } catch {}
   }
@@ -85,17 +100,23 @@ export default function LaporanPage() {
   }, [endDate])
 
   async function handleSearch() {
-    setLoading(true)
+    const params = new URLSearchParams({
+      limit: 500,
+      ...(startDate && { startDate }),
+      ...(endDate && { endDate }),
+      ...(memberId && { memberId }),
+      ...(category && { category }),
+    })
+    const url = `/api/transactions?${params}`
+    const cached = peekCache(url)
+    if (cached) {
+      setData(cached)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     try {
-      const params = new URLSearchParams({
-        limit: 500,
-        ...(startDate && { startDate }),
-        ...(endDate && { endDate }),
-        ...(memberId && { memberId }),
-        ...(category && { category }),
-      })
-      const res = await fetch(`/api/transactions?${params}`)
-      const json = await res.json()
+      const json = await cachedFetch(url, { ttlMs: 30000 })
       setData(json)
     } catch {}
     setLoading(false)

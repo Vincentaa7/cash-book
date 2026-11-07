@@ -3,7 +3,7 @@
 // Semua halaman autentikasi dibungkus komponen ini
 
 import { useState, useEffect } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   LayoutDashboard, PlusCircle, List, BarChart2,
@@ -14,6 +14,7 @@ import { useLanguage } from '@/components/LanguageContext'
 import { useUser } from '@/components/UserContext'
 import CarryOverModal from '@/components/CarryOverModal'
 import AiChatWidget from '@/components/AiChatWidget'
+import { prefetchApiCache, invalidateCache } from '@/lib/clientCache'
 
 const NAV_ITEMS = [
   { href: '/dashboard',      labelKey: 'dashboard',       icon: LayoutDashboard },
@@ -31,11 +32,31 @@ let cachedCarryOverResult = null
 
 export default function AppShell({ children }) {
   const pathname = usePathname()
+  const router = useRouter()
   const { t, language } = useLanguage()
   const { user, loading, familyName } = useUser()
   const [theme, setTheme] = useState('light')
   const [carryOverData, setCarryOverData] = useState(cachedCarryOverResult)
   const [isSnoozed, setIsSnoozed] = useState(false)
+
+  // Pre-warm halaman & endpoint API utama di background saat browser idle
+  // agar perpindahan halaman dari Dashboard ke menu lain terasa instan (0ms)
+  useEffect(() => {
+    if (!user) return
+    const now = new Date()
+    const m = now.getMonth() + 1
+    const y = now.getFullYear()
+
+    NAV_ITEMS.forEach(item => {
+      try { router.prefetch(item.href) } catch {}
+    })
+
+    prefetchApiCache([
+      `/api/dashboard?month=${m}&year=${y}&summaryOnly=true`,
+      '/api/transactions?page=1&limit=15&sortBy=transactionDate&sortOrder=desc',
+      '/api/members',
+    ])
+  }, [user, router])
 
   // Cek Pindahan Saldo (Hanya sekali per sesi keluarga atau saat tengah malam, tidak setiap pindah menu)
   useEffect(() => {
@@ -100,6 +121,7 @@ export default function AppShell({ children }) {
   async function handleLogout() {
     lastCarryOverCheckKey = null
     cachedCarryOverResult = null
+    invalidateCache()
     await fetch('/api/auth/logout', { method: 'POST' })
     window.location.href = '/login'
   }

@@ -8,18 +8,24 @@ import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
 import { formatRupiah, formatDate, formatDateInput, formatTime } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo, getInitials } from '@/lib/constants'
+import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
 import { Search, Download, Edit2, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
+
+const DEFAULT_TX_URL = '/api/transactions?page=1&limit=15&sortBy=transactionDate&sortOrder=desc'
 
 export default function TransaksiPage() {
   const { t, language } = useLanguage()
   const { user } = useUser()
-  const [transactions, setTransactions] = useState([])
-  const [total, setTotal] = useState(0)
+  const initialTxCache = peekCache(DEFAULT_TX_URL)
+  const initialMembersCache = peekCache('/api/members')
+
+  const [transactions, setTransactions] = useState(() => initialTxCache?.transactions || [])
+  const [total, setTotal] = useState(() => initialTxCache?.total || 0)
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [members, setMembers] = useState([])
+  const [totalPages, setTotalPages] = useState(() => initialTxCache?.totalPages || 1)
+  const [loading, setLoading] = useState(() => !initialTxCache)
+  const [members, setMembers] = useState(() => initialMembersCache?.members || [])
 
   // Filters
   const [search, setSearch] = useState('')
@@ -40,23 +46,35 @@ export default function TransaksiPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/members').then(r => r.json()).then(d => setMembers(d.members || []))
+    cachedFetch('/api/members', { ttlMs: 60000 })
+      .then(d => setMembers(d.members || []))
+      .catch(() => {})
   }, [])
 
-  const fetchTransactions = useCallback(async () => {
-    setLoading(true)
+  const fetchTransactions = useCallback(async (forceRefresh = false) => {
+    const params = new URLSearchParams({
+      page, limit: 15,
+      sortBy, sortOrder,
+      ...(search && { search }),
+      ...(category && { category }),
+      ...(memberId && { memberId }),
+      ...(startDate && { startDate }),
+      ...(endDate && { endDate }),
+    })
+    const url = `/api/transactions?${params}`
+    const cached = !forceRefresh ? peekCache(url) : null
+
+    if (cached) {
+      setTransactions(cached.transactions || [])
+      setTotal(cached.total || 0)
+      setTotalPages(cached.totalPages || 1)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+
     try {
-      const params = new URLSearchParams({
-        page, limit: 15,
-        sortBy, sortOrder,
-        ...(search && { search }),
-        ...(category && { category }),
-        ...(memberId && { memberId }),
-        ...(startDate && { startDate }),
-        ...(endDate && { endDate }),
-      })
-      const res = await fetch(`/api/transactions?${params}`)
-      const data = await res.json()
+      const data = await cachedFetch(url, { ttlMs: 30000, forceRefresh })
       setTransactions(data.transactions || [])
       setTotal(data.total || 0)
       setTotalPages(data.totalPages || 1)
@@ -139,8 +157,12 @@ export default function TransaksiPage() {
         body: JSON.stringify({ ...editForm, amount: parseInt(editForm.amount) }),
       })
       if (res.ok) {
+        const { transaction: updatedTx } = await res.json()
         setEditTx(null)
-        fetchTransactions()
+        // Optimistic update langsung ke tabel tanpa menunggu spinner
+        setTransactions(prev => prev.map(item => item.id === updatedTx.id ? updatedTx : item))
+        invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
+        fetchTransactions(true)
       }
     } catch {}
     setEditLoading(false)
@@ -150,10 +172,15 @@ export default function TransaksiPage() {
   async function handleDelete() {
     setDeleteLoading(true)
     try {
-      const res = await fetch(`/api/transactions/${deleteTx.id}`, { method: 'DELETE' })
+      const targetId = deleteTx.id
+      const res = await fetch(`/api/transactions/${targetId}`, { method: 'DELETE' })
       if (res.ok) {
         setDeleteTx(null)
-        fetchTransactions()
+        // Optimistic update: langsung hilangkan baris dari tabel
+        setTransactions(prev => prev.filter(item => item.id !== targetId))
+        setTotal(prev => Math.max(0, prev - 1))
+        invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
+        fetchTransactions(true)
       }
     } catch {}
     setDeleteLoading(false)

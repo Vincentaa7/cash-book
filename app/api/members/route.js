@@ -54,10 +54,18 @@ export async function POST(request) {
 
     const cleanName = name.trim()
 
-    // Cek duplikat username secara global agar tidak bentrok saat login
-    const existing = await prisma.member.findFirst({
-      where: { name: cleanName },
-    })
+    // Cek duplikat username, hitung batas 5 anggota, dan hash PIN secara paralel (1 round-trip!)
+    const [existing, count, hashedPin] = await Promise.all([
+      prisma.member.findFirst({
+        where: { name: cleanName },
+        select: { id: true },
+      }),
+      prisma.member.count({
+        where: { familyId, isActive: true },
+      }),
+      bcrypt.hash(String(pin), 10),
+    ])
+
     if (existing) {
       const suggestions = await generateUsernameSuggestions(cleanName)
       return NextResponse.json(
@@ -70,15 +78,10 @@ export async function POST(request) {
       )
     }
 
-    // Cek batas maksimal 5 anggota aktif di dalam keluarga ini
-    const count = await prisma.member.count({
-      where: { familyId, isActive: true },
-    })
     if (count >= 5) {
       return NextResponse.json({ error: 'Maksimal 5 anggota keluarga aktif' }, { status: 400 })
     }
 
-    const hashedPin = await bcrypt.hash(String(pin), 10)
     const member = await prisma.member.create({
       data: {
         familyId,
@@ -91,8 +94,8 @@ export async function POST(request) {
       select: { id: true, familyId: true, name: true, role: true, avatarColor: true, isActive: true },
     })
 
-    // Catat log aktivitas tambah anggota di keluarga ini
-    await logActivity({
+    // Catat log aktivitas tambah anggota di background
+    void logActivity({
       familyId,
       action: 'MEMBER_CREATE',
       description: `${session.name} menambah anggota keluarga baru bernama "${cleanName}" dengan role "${member.role}"`,

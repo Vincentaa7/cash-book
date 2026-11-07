@@ -7,6 +7,7 @@ import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
 import { formatRupiah, formatDate, formatMonthYear, getMonthName, getBudgetStatusColor, MONTH_NAMES } from '@/lib/format'
 import { getCategoryInfo } from '@/lib/constants'
+import { cachedFetch, peekCache, setCache } from '@/lib/clientCache'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid
@@ -19,21 +20,30 @@ export default function DashboardPage() {
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const dashUrl = `/api/dashboard?month=${month}&year=${year}`
+  const [data, setData] = useState(() => peekCache(dashUrl))
+  const [loading, setLoading] = useState(() => !peekCache(dashUrl))
 
   const fetchDashboard = useCallback(async () => {
-    setLoading(true)
+    const cached = peekCache(dashUrl)
+    if (cached) {
+      setData(cached)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     try {
-      const res = await fetch(`/api/dashboard?month=${month}&year=${year}`)
-      const json = await res.json()
+      const json = await cachedFetch(dashUrl, { ttlMs: 30000 })
       setData(json)
+      if (json?.summary) {
+        setCache(`/api/dashboard?month=${month}&year=${year}&summaryOnly=true`, { summary: json.summary })
+      }
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
     }
-  }, [month, year])
+  }, [dashUrl, month, year])
 
   useEffect(() => {
     fetchDashboard()

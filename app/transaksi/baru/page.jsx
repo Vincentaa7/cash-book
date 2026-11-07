@@ -8,6 +8,7 @@ import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import { CATEGORIES } from '@/lib/constants'
 import { formatRupiah, formatNumber, formatDateInput } from '@/lib/format'
+import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
 import { AlertCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
@@ -17,6 +18,13 @@ export default function NewTransactionPage() {
   const { user } = useUser()
 
   const now = new Date()
+  const curMonth = now.getMonth() + 1
+  const curYear = now.getFullYear()
+  const summaryUrl = `/api/dashboard?month=${curMonth}&year=${curYear}&summaryOnly=true`
+  const fullDashUrl = `/api/dashboard?month=${curMonth}&year=${curYear}`
+
+  const initialCachedSummary = peekCache(summaryUrl)?.summary || peekCache(fullDashUrl)?.summary || null
+
   const [form, setForm] = useState({
     itemName: '',
     amount: '',
@@ -27,26 +35,26 @@ export default function NewTransactionPage() {
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [budget, setBudget] = useState(null)
-  const [totalExpense, setTotalExpense] = useState(0)
+  const [budget, setBudget] = useState(() =>
+    initialCachedSummary?.totalBudget > 0 ? { amount: initialCachedSummary.totalBudget } : null
+  )
+  const [totalExpense, setTotalExpense] = useState(() => initialCachedSummary?.totalExpense || 0)
   const [showConfirm, setShowConfirm] = useState(false)
 
-  // Ambil info budget bulan ini
+  // Ambil info sisa kas bulan ini (cukup 1 endpoint ringan + SWR cache 0ms jika sudah dari Dashboard)
   useEffect(() => {
-    async function fetchBudget() {
+    router.prefetch('/transaksi')
+    async function fetchBudgetSummary() {
       try {
-        const [budgetRes, dashRes] = await Promise.all([
-          fetch(`/api/budget?month=${now.getMonth() + 1}&year=${now.getFullYear()}`),
-          fetch(`/api/dashboard?month=${now.getMonth() + 1}&year=${now.getFullYear()}&summaryOnly=true`),
-        ])
-        const budgetData = await budgetRes.json()
-        const dashData = await dashRes.json()
-        setBudget(budgetData.budget)
-        setTotalExpense(dashData.summary?.totalExpense || 0)
+        const dashData = await cachedFetch(summaryUrl, { ttlMs: 30000 })
+        if (dashData?.summary) {
+          setBudget(dashData.summary.totalBudget > 0 ? { amount: dashData.summary.totalBudget } : null)
+          setTotalExpense(dashData.summary.totalExpense || 0)
+        }
       } catch {}
     }
-    fetchBudget()
-  }, [])
+    fetchBudgetSummary()
+  }, [router, summaryUrl])
 
   function handleAmountChange(e) {
     const raw = e.target.value.replace(/\./g, '').replace(/[^0-9]/g, '')
@@ -84,10 +92,13 @@ export default function NewTransactionPage() {
       })
 
       if (res.ok) {
+        // Bersihkan cache transaksi & dashboard, lalu pre-fetch halaman riwayat di background
+        invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
+        cachedFetch('/api/transactions?page=1&limit=15&sortBy=transactionDate&sortOrder=desc', { forceRefresh: true }).catch(() => {})
         setSuccess(true)
         setTimeout(() => {
           router.push('/transaksi')
-        }, 1800)
+        }, 450)
       } else {
         const data = await res.json()
         setErrors({ submit: data.error || t('connection_error') })

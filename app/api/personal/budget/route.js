@@ -64,80 +64,61 @@ export async function POST(request) {
     let resultAmount = Number(parsedAmount)
 
     if (action === 'add') {
-      // Top-up: Tambah ke saldo utama
-      if (prisma.personalBudget) {
-        const existing = await prisma.personalBudget.findUnique({
-          where: {
-            uq_personal_budget: {
-              memberId: session.id,
-              month: parsedMonth,
-              year:  parsedYear,
-            },
-          },
-        })
-
-        if (existing) {
-          const updated = await prisma.personalBudget.update({
-            where: { id: existing.id },
-            data: { amount: { increment: parsedAmount } },
-          })
-          resultAmount = Number(updated.amount)
-        } else {
-          const created = await prisma.personalBudget.create({
-            data: {
-              memberId: session.id,
-              month: parsedMonth,
-              year:  parsedYear,
-              amount: parsedAmount,
-            },
-          })
-          resultAmount = Number(created.amount)
-        }
-      } else {
-        const existing = await prisma.$queryRaw`
-          SELECT id, amount FROM personal_budgets
-          WHERE member_id = ${session.id} AND month = ${parsedMonth} AND year = ${parsedYear}
-          LIMIT 1
-        `
-        if (existing.length > 0) {
-          await prisma.$executeRaw`
-            UPDATE personal_budgets
-            SET amount = amount + ${parsedAmount}, updated_at = NOW()
-            WHERE id = ${existing[0].id}
-          `
-          resultAmount = Number(existing[0].amount) + Number(parsedAmount)
-        } else {
-          await prisma.$executeRaw`
-            INSERT INTO personal_budgets (id, member_id, month, year, amount, created_at, updated_at)
-            VALUES (UUID(), ${session.id}, ${parsedMonth}, ${parsedYear}, ${parsedAmount}, NOW(), NOW())
-          `
-          resultAmount = Number(parsedAmount)
-        }
-      }
-
-      // Catat transaksi kas masuk (top-up) ke catatan pribadi
       let txDate = new Date()
       if (txDate.getMonth() + 1 !== parsedMonth || txDate.getFullYear() !== parsedYear) {
         txDate = new Date(parsedYear, parsedMonth - 1, 1)
       }
 
-      if (prisma.personalTransaction) {
-        await prisma.personalTransaction.create({
-          data: {
-            memberId: session.id,
-            itemName: 'Tambah Saldo (Top-Up)',
-            amount:   parsedAmount,
-            type:     'income',
-            category: 'tabungan',
-            date:     txDate,
-            notes:    notes?.trim() || 'Top-up saldo utama kas pribadi',
-          },
-        })
+      // Top-up: Jalankan upsert saldo utama & pencatatan transaksi masuk secara paralel (1 round-trip!)
+      if (prisma.personalBudget && prisma.personalTransaction) {
+        const [upsertedBudget] = await Promise.all([
+          prisma.personalBudget.upsert({
+            where: {
+              uq_personal_budget: {
+                memberId: session.id,
+                month: parsedMonth,
+                year:  parsedYear,
+              },
+            },
+            update: { amount: { increment: parsedAmount } },
+            create: {
+              memberId: session.id,
+              month: parsedMonth,
+              year:  parsedYear,
+              amount: parsedAmount,
+            },
+          }),
+          prisma.personalTransaction.create({
+            data: {
+              memberId: session.id,
+              itemName: 'Tambah Saldo (Top-Up)',
+              amount:   parsedAmount,
+              type:     'income',
+              category: 'tabungan',
+              date:     txDate,
+              notes:    notes?.trim() || 'Top-up saldo utama kas pribadi',
+            },
+          }),
+        ])
+        resultAmount = Number(upsertedBudget.amount)
       } else {
-        await prisma.$executeRaw`
-          INSERT INTO personal_transactions (id, member_id, item_name, amount, type, category, date, notes, created_at, updated_at)
-          VALUES (UUID(), ${session.id}, 'Tambah Saldo (Top-Up)', ${parsedAmount}, 'income', 'tabungan', ${txDate}, ${notes?.trim() || 'Top-up saldo utama kas pribadi'}, NOW(), NOW())
+        await Promise.all([
+          prisma.$executeRaw`
+            INSERT INTO personal_budgets (id, member_id, month, year, amount, created_at, updated_at)
+            VALUES (UUID(), ${session.id}, ${parsedMonth}, ${parsedYear}, ${parsedAmount}, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE amount = amount + ${parsedAmount}, updated_at = NOW()
+          `,
+          prisma.$executeRaw`
+            INSERT INTO personal_transactions (id, member_id, item_name, amount, type, category, date, notes, created_at, updated_at)
+            VALUES (UUID(), ${session.id}, 'Tambah Saldo (Top-Up)', ${parsedAmount}, 'income', 'tabungan', ${txDate}, ${notes?.trim() || 'Top-up saldo utama kas pribadi'}, NOW(), NOW())
+          `,
+        ])
+        const rows = await prisma.$queryRaw`
+          SELECT amount FROM personal_budgets
+          WHERE member_id = ${session.id} AND month = ${parsedMonth} AND year = ${parsedYear}
+          LIMIT 1
         `
+        if (rows.length > 0) resultAmount = Number(rows[0].amount)
       }
     } else {
       // Set saldo utama

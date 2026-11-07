@@ -8,6 +8,7 @@ import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import { formatNumber, formatDate, formatTime } from '@/lib/format'
 import { AVATAR_COLORS } from '@/lib/constants'
+import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
 import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle, Shield, Database, Trash, ClipboardList, KeyRound, Copy, RefreshCw } from 'lucide-react'
 import DailyReminderSetup from '@/components/DailyReminderSetup'
 
@@ -63,13 +64,29 @@ function PengaturanContent() {
     }
   }, [user, currentMonth, currentYear])
 
-  async function fetchData() {
-    setLoading(true)
+  async function fetchData(forceRefresh = false) {
+    const budgetUrl = `/api/budget?month=${currentMonth}&year=${currentYear}`
+    const cachedB = !forceRefresh ? peekCache(budgetUrl) : null
+    const cachedM = !forceRefresh ? peekCache('/api/members') : null
+    const cachedS = !forceRefresh ? peekCache('/api/settings') : null
+
+    if (cachedB?.budget) {
+      setBudgetAmount(String(cachedB.budget.amount))
+      setInitialBudget(Number(cachedB.budget.amount))
+    }
+    if (cachedM?.members) setMembers(cachedM.members)
+    if (cachedS?.settings?.familyName) setFormFamilyName(cachedS.settings.familyName)
+    if (cachedS?.settings?.inviteCode) setInviteCode(cachedS.settings.inviteCode)
+
+    if (!cachedB || !cachedM || !cachedS) {
+      setLoading(true)
+    }
+
     try {
       const [b, M, s] = await Promise.all([
-        fetch(`/api/budget?month=${currentMonth}&year=${currentYear}`).then(r => r.json()),
-        fetch('/api/members').then(r => r.json()),
-        fetch('/api/settings').then(r => r.json())
+        cachedFetch(budgetUrl, { ttlMs: 30000, forceRefresh }),
+        cachedFetch('/api/members', { ttlMs: 60000, forceRefresh }),
+        cachedFetch('/api/settings', { ttlMs: 60000, forceRefresh })
       ])
       
       if (b.budget) {
@@ -200,7 +217,8 @@ function PengaturanContent() {
         })
       })
       if (res.ok) {
-        fetchData()
+        invalidateCache(['/api/budget', '/api/dashboard'])
+        fetchData(true)
         showMessage('success', t('save') + ' ' + t('budget_settings'))
       } else {
         showMessage('error', t('connection_error'))
@@ -232,7 +250,8 @@ function PengaturanContent() {
       })
       if (res.ok) {
         setAddAmount('')
-        fetchData()
+        invalidateCache(['/api/budget', '/api/dashboard', '/api/transactions'])
+        fetchData(true)
         showMessage('success', t('add_cash_success'))
       } else {
         const d = await res.json()
@@ -286,7 +305,8 @@ function PengaturanContent() {
       const d = await res.json()
       if (res.ok) {
         setShowMemberModal(false)
-        fetchData()
+        invalidateCache('/api/members')
+        fetchData(true)
         showMessage('success', `${t('family_members')} ${editMember ? t('edit') : t('add_member')}`)
       } else {
         setMemberModalError(d.error || t('connection_error'))

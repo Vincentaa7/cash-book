@@ -21,27 +21,32 @@ export async function POST(request) {
     const year = (bodyYear >= 2020 && bodyYear <= 2100) ? bodyYear : today.year
     const currentMonthStr = `${year}-${String(month).padStart(2, '0')}`
 
-    const existingBudget = await prisma.monthlyBudget.findUnique({
-      where: { uq_month_year: { familyId, month, year } },
-    })
+    let prevMonth = month - 1
+    let prevYear = year
+    if (prevMonth === 0) { prevMonth = 12; prevYear -= 1 }
+
+    // Ambil budget bulan ini & hitung sisa saldo bulan lalu secara paralel
+    const [existingBudget, amount] = await Promise.all([
+      prisma.monthlyBudget.findUnique({
+        where: { uq_month_year: { familyId, month, year } },
+      }),
+      action === 'reject'
+        ? Promise.resolve(null)
+        : getMonthRemainingBalance(prevMonth, prevYear, familyId),
+    ])
 
     if (action === 'reject') {
-      // Tolak pindahan: HANYA tandai sudah diproses.
-      // Kas bulan ini yang sudah ada TIDAK lagi dihapus (dulu bisa menghapus
-      // kas yang baru saja diatur admin).
-      await Promise.all([
-        prisma.appSettings.update({
-          where: { id: familyId },
-          data: { lastCarryOverMonth: currentMonthStr },
-        }),
-        logActivity({
-          action: 'BUDGET_UPDATE',
-          description: `${session.name} menolak pemindahan sisa kas bulan lalu ke ${month}/${year}`,
-          details: { month, year, action: 'reject', existingBudget: existingBudget ? Number(existingBudget.amount) : null },
-          memberId: session.id,
-          familyId,
-        })
-      ])
+      await prisma.appSettings.update({
+        where: { id: familyId },
+        data: { lastCarryOverMonth: currentMonthStr },
+      })
+      void logActivity({
+        action: 'BUDGET_UPDATE',
+        description: `${session.name} menolak pemindahan sisa kas bulan lalu ke ${month}/${year}`,
+        details: { month, year, action: 'reject', existingBudget: existingBudget ? Number(existingBudget.amount) : null },
+        memberId: session.id,
+        familyId,
+      })
       return NextResponse.json({ success: true, message: 'Rejected' })
     }
 
@@ -57,44 +62,44 @@ export async function POST(request) {
       )
     }
 
-    // Hitung ulang sisa saldo bulan lalu di server (tidak percaya nominal dari browser,
-    // karena bisa sudah berubah sejak popup muncul)
-    let prevMonth = month - 1
-    let prevYear = year
-    if (prevMonth === 0) { prevMonth = 12; prevYear -= 1 }
-    const amount = await getMonthRemainingBalance(prevMonth, prevYear, familyId)
-
     if (amount === null || amount <= 0) {
       return NextResponse.json({ error: 'Tidak ada sisa saldo bulan lalu untuk dipindahkan' }, { status: 400 })
     }
 
-    await prisma.monthlyBudget.create({
-      data: {
-        familyId,
-        month,
-        year,
-        amount: BigInt(amount),
-        createdBy: session.id,
-      },
-    })
+    // Buat kas bulan baru & tandai sudah diproses secara paralel (1 round-trip!)
+    await Promise.all([
+      prisma.monthlyBudget.create({
+        data: {
+          familyId,
+          month,
+          year,
+          amount: BigInt(amount),
+          createdBy: session.id,
+        },
+      }),
+      prisma.appSettings.update({
+        where: { id: familyId },
+        data: { lastCarryOverMonth: currentMonthStr },
+      }),
+    ])
 
-    // Tandai sudah diproses bulan ini
-    await prisma.appSettings.update({
-      where: { id: familyId },
-      data: { lastCarryOverMonth: currentMonthStr },
-    })
+    // Catat log aktivitas pindah saldo di background
+    void (async () => {
+      try {
+        const remainingBalance = await getMonthRemainingBalance(month, year, familyId)
+        const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
 
-    // Catat log aktivitas pindah saldo
-    const remainingBalance = await getMonthRemainingBalance(month, year, familyId)
-    const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
-
-    await logActivity({
-      action: 'BUDGET_UPDATE',
-      description: `${session.name} memindahkan sisa kas ${prevMonth}/${prevYear} sebesar ${formatRupiah(amount)} ke kas bulan ${month}/${year}${balanceText}`,
-      details: { month, year, prevMonth, prevYear, amount, action: 'agree', totalBudget: amount, remainingBalance },
-      memberId: session.id,
-      familyId,
-    })
+        await logActivity({
+          action: 'BUDGET_UPDATE',
+          description: `${session.name} memindahkan sisa kas ${prevMonth}/${prevYear} sebesar ${formatRupiah(amount)} ke kas bulan ${month}/${year}${balanceText}`,
+          details: { month, year, prevMonth, prevYear, amount, action: 'agree', totalBudget: amount, remainingBalance },
+          memberId: session.id,
+          familyId,
+        })
+      } catch (err) {
+        console.error('Background carryover log error:', err)
+      }
+    })()
 
     return NextResponse.json({ success: true, newAmount: amount })
   } catch (error) {

@@ -5,6 +5,7 @@ import AppShell from '@/components/AppShell'
 import { useLanguage } from '@/components/LanguageContext'
 import { formatRupiah, formatMonthYear } from '@/lib/format'
 import { getCategoryInfo } from '@/lib/constants'
+import { cachedFetch, peekCache } from '@/lib/clientCache'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info } from 'lucide-react'
 
 export default function CalendarPage() {
@@ -12,8 +13,9 @@ export default function CalendarPage() {
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
-  const [transactions, setTransactions] = useState([])
-  const [loading, setLoading] = useState(true)
+  const calUrl = `/api/transactions?month=${month}&year=${year}&limit=1000`
+  const [transactions, setTransactions] = useState(() => peekCache(calUrl)?.transactions || [])
+  const [loading, setLoading] = useState(() => !peekCache(calUrl))
   const [selectedDay, setSelectedDay] = useState(null) // number
   const [slideDir, setSlideDir] = useState(null) // 'left' | 'right' | null for animation
 
@@ -22,20 +24,23 @@ export default function CalendarPage() {
   const touchStartY = useRef(null)
 
   const fetchMonthTransactions = useCallback(async () => {
-    setLoading(true)
+    const cached = peekCache(calUrl)
+    if (cached) {
+      setTransactions(cached.transactions || [])
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
     try {
       // Ambil transaksi bulan ini (limit besar agar terambil semua)
-      const res = await fetch(`/api/transactions?month=${month}&year=${year}&limit=1000`)
-      if (res.ok) {
-        const json = await res.json()
-        setTransactions(json.transactions || [])
-      }
+      const json = await cachedFetch(calUrl, { ttlMs: 30000 })
+      setTransactions(json.transactions || [])
     } catch (e) {
       console.error('Fetch calendar error:', e)
     } finally {
       setLoading(false)
     }
-  }, [month, year])
+  }, [calUrl])
 
   useEffect(() => {
     fetchMonthTransactions()

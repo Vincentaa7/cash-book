@@ -41,42 +41,8 @@ export async function GET(request) {
       ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
     }
 
-    const [items, total] = await Promise.all([
-      prisma.personalTransaction.findMany({
-        where,
-        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-        skip:  (page - 1) * limit,
-        take:  limit,
-      }),
-      prisma.personalTransaction.count({ where }),
-    ])
-
-    // Ambil saldo utama untuk periode bulan & tahun ini
     const curMonth = month || (new Date().getMonth() + 1)
     const curYear  = year  || new Date().getFullYear()
-
-    let budgetAmount = 0
-    if (prisma.personalBudget) {
-      const personalBudget = await prisma.personalBudget.findUnique({
-        where: {
-          uq_personal_budget: {
-            memberId: session.id,
-            month: curMonth,
-            year:  curYear,
-          },
-        },
-      })
-      if (personalBudget) budgetAmount = Number(personalBudget.amount)
-    } else {
-      const rows = await prisma.$queryRaw`
-        SELECT amount FROM personal_budgets
-        WHERE member_id = ${session.id} AND month = ${curMonth} AND year = ${curYear}
-        LIMIT 1
-      `
-      if (rows.length > 0) budgetAmount = Number(rows[0].amount)
-    }
-
-    // Hitung summary untuk bulan & tahun yang dipilih
     const periodWhere = {
       memberId: session.id,
       date: {
@@ -85,18 +51,50 @@ export async function GET(request) {
       },
     }
 
-    const periodItems = await prisma.personalTransaction.findMany({
-      where: periodWhere,
-      select: { amount: true, type: true, itemName: true },
-    })
+    // Eksekusi seluruh query buku kas pribadi dalam 1 batch paralel (1 round-trip ke database!)
+    const [items, total, personalBudgetResult, periodGrouped] = await Promise.all([
+      prisma.personalTransaction.findMany({
+        where,
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        skip:  (page - 1) * limit,
+        take:  limit,
+      }),
+      prisma.personalTransaction.count({ where }),
+      prisma.personalBudget
+        ? prisma.personalBudget.findUnique({
+            where: {
+              uq_personal_budget: {
+                memberId: session.id,
+                month: curMonth,
+                year:  curYear,
+              },
+            },
+          })
+        : prisma.$queryRaw`
+            SELECT amount FROM personal_budgets
+            WHERE member_id = ${session.id} AND month = ${curMonth} AND year = ${curYear}
+            LIMIT 1
+          `,
+      prisma.personalTransaction.groupBy({
+        by: ['type'],
+        where: periodWhere,
+        _sum: { amount: true },
+      }),
+    ])
 
-    const totalExpense = periodItems
-      .filter(i => i.type === 'expense')
-      .reduce((s, i) => s + Number(i.amount), 0)
+    let budgetAmount = 0
+    if (Array.isArray(personalBudgetResult)) {
+      if (personalBudgetResult.length > 0) budgetAmount = Number(personalBudgetResult[0].amount)
+    } else if (personalBudgetResult) {
+      budgetAmount = Number(personalBudgetResult.amount)
+    }
 
-    const totalIncome = periodItems
-      .filter(i => i.type === 'income')
-      .reduce((s, i) => s + Number(i.amount), 0)
+    let totalExpense = 0
+    let totalIncome = 0
+    for (const grp of periodGrouped) {
+      if (grp.type === 'expense') totalExpense += Number(grp._sum.amount || 0)
+      if (grp.type === 'income') totalIncome += Number(grp._sum.amount || 0)
+    }
 
     // Sisa saldo kalkulasi:
     // Jika ada Saldo Utama: Sisa Saldo = Saldo Utama - Total Pengeluaran

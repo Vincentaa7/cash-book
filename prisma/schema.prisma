@@ -71,6 +71,8 @@ model Transaction {
   @@index([transactionDate])
   @@index([category])
   @@index([memberId])
+  @@index([familyId, transactionDate])
+  @@index([familyId, category, transactionDate])
   @@map("transactions")
 }
 
