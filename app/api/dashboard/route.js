@@ -17,65 +17,12 @@ export async function GET(request) {
     const month = parseInt(searchParams.get('month')) || now.getMonth() + 1
     const year = parseInt(searchParams.get('year')) || now.getFullYear()
     const summaryOnly = searchParams.get('summaryOnly') === 'true'
-    const startDateParam = searchParams.get('startDate')
-    const endDateParam = searchParams.get('endDate')
 
     // Tanggal awal dan akhir bulan aktif (UTC bounds)
     const firstDay = new Date(Date.UTC(year, month - 1, 1))
     const lastDay = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
 
     if (summaryOnly) {
-      if (startDateParam && endDateParam) {
-        const start = new Date(startDateParam)
-        const end = new Date(endDateParam)
-        end.setUTCHours(23, 59, 59, 999)
-
-        // Generate list of months covered in period
-        const monthsInPeriod = []
-        let cur = new Date(Date.UTC(start.getFullYear(), start.getMonth(), 1))
-        const endLimit = new Date(Date.UTC(end.getFullYear(), end.getMonth(), 1))
-        while (cur <= endLimit) {
-          monthsInPeriod.push({
-            month: cur.getUTCMonth() + 1,
-            year: cur.getUTCFullYear(),
-          })
-          cur.setUTCMonth(cur.getUTCMonth() + 1)
-        }
-
-        const [budgets, transactions] = await Promise.all([
-          monthsInPeriod.length > 0
-            ? prisma.monthlyBudget.findMany({
-                where: {
-                  familyId,
-                  OR: monthsInPeriod.map(m => ({ month: m.month, year: m.year })),
-                },
-              })
-            : Promise.resolve([]),
-          prisma.transaction.aggregate({
-            where: {
-              familyId,
-              transactionDate: { gte: start, lte: end },
-              category: { not: 'pemasukan' },
-            },
-            _sum: { amount: true },
-          }),
-        ])
-
-        const totalBudget = budgets.reduce((sum, b) => sum + Number(b.amount), 0)
-        const totalExpense = Number(transactions._sum.amount || 0)
-        const remaining = totalBudget - totalExpense
-
-        return NextResponse.json({
-          summary: {
-            totalBudget,
-            totalExpense,
-            remaining,
-            budgetPercentUsed: totalBudget > 0 ? Math.round((totalExpense / totalBudget) * 100) : 0,
-            monthsCount: monthsInPeriod.length,
-          },
-        })
-      }
-
       const [budget, transactions] = await Promise.all([
         prisma.monthlyBudget.findUnique({
           where: { uq_month_year: { familyId, month, year } },

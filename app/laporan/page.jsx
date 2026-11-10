@@ -50,7 +50,6 @@ export default function LaporanPage() {
   const [data, setData] = useState(() => peekCache(initTxUrl))
   const [dashboardSummary, setDashboardSummary] = useState(
     () =>
-      peekCache(`/api/dashboard?summaryOnly=true&startDate=${initStartStr}&endDate=${todayStr}`)?.summary ||
       peekCache(`/api/dashboard?month=${todayParts.month}&year=${todayParts.year}&summaryOnly=true`)?.summary ||
       peekCache(`/api/dashboard?month=${todayParts.month}&year=${todayParts.year}`)?.summary ||
       null
@@ -61,21 +60,39 @@ export default function LaporanPage() {
   const [members, setMembers] = useState(() => peekCache('/api/members')?.members || [])
   const [loading, setLoading] = useState(() => !peekCache(initTxUrl))
 
+  const getSelectedMonthYear = () => {
+    if (startDate && endDate) {
+      const sParts = startDate.split('-').map(Number)
+      const eParts = endDate.split('-').map(Number)
+      if (sParts[0] === eParts[0] && sParts[1] === eParts[1]) {
+        return { month: sParts[1], year: sParts[0], isSameMonth: true }
+      }
+    }
+    if (endDate) {
+      const parts = endDate.split('-').map(Number)
+      if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        return { month: parts[1], year: parts[0], isSameMonth: false }
+      }
+    }
+    return { month: todayParts.month, year: todayParts.year, isSameMonth: true }
+  }
+
+  const { month: selectedMonth, year: selectedYear, isSameMonth } = getSelectedMonthYear()
+
   useEffect(() => {
     cachedFetch('/api/members', { ttlMs: 60000 })
       .then(d => setMembers(d.members || []))
       .catch(() => {})
   }, [])
 
-  async function fetchSummaryForPeriod(start, end) {
+  async function fetchSummaryForMonth(m, y) {
     try {
-      const url = `/api/dashboard?summaryOnly=true&startDate=${start}&endDate=${end}`
-      const fullDash = peekCache(url)
+      const fullDash = peekCache(`/api/dashboard?month=${m}&year=${y}`)
       if (fullDash?.summary) {
         setDashboardSummary(fullDash.summary)
         return
       }
-      const d = await cachedFetch(url, { ttlMs: 30000 })
+      const d = await cachedFetch(`/api/dashboard?month=${m}&year=${y}&summaryOnly=true`, { ttlMs: 30000 })
       if (d?.summary) setDashboardSummary(d.summary)
     } catch {}
   }
@@ -88,20 +105,9 @@ export default function LaporanPage() {
   }
 
   useEffect(() => {
-    if (startDate && endDate) {
-      fetchSummaryForPeriod(startDate, endDate)
-    }
-    if (endDate) {
-      const parts = endDate.split('-')
-      if (parts.length >= 2) {
-        const year = parseInt(parts[0], 10)
-        const month = parseInt(parts[1], 10)
-        if (!isNaN(year) && !isNaN(month)) {
-          fetchComparison(month, year)
-        }
-      }
-    }
-  }, [startDate, endDate])
+    fetchSummaryForMonth(selectedMonth, selectedYear)
+    fetchComparison(selectedMonth, selectedYear)
+  }, [selectedMonth, selectedYear])
 
   async function handleSearch() {
     const params = new URLSearchParams({
@@ -210,14 +216,14 @@ export default function LaporanPage() {
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(9)
         doc.setTextColor(100, 116, 139)
-        doc.text('I. RINGKASAN ANGGARAN KAS', 14, curY)
+        doc.text(`I. RINGKASAN ANGGARAN KAS (${formatMonthYear(selectedMonth, selectedYear, language)})`, 14, curY)
         curY += 4
         autoTable(doc, {
           startY: curY,
           head: [['Parameter', 'Nominal']],
           body: [
-            ['Total Anggaran', formatRupiah(dashboardSummary.totalBudget)],
-            ['Total Pengeluaran', formatRupiah(dashboardSummary.totalExpense)],
+            [`Total Anggaran (${formatMonthYear(selectedMonth, selectedYear, language)})`, formatRupiah(dashboardSummary.totalBudget)],
+            [`Pengeluaran (${formatMonthYear(selectedMonth, selectedYear, language)})`, formatRupiah(dashboardSummary.totalExpense)],
             ['Sisa Anggaran', formatRupiah(dashboardSummary.remaining)],
             ['Persentase Terpakai', `${dashboardSummary.budgetPercentUsed}%`],
           ],
@@ -365,16 +371,6 @@ export default function LaporanPage() {
     .map(([name, amt]) => ({ name, amount: amt }))
     .sort((a, b) => b.amount - a.amount)
 
-  const formatPeriodLabel = () => {
-    if (!startDate || !endDate) return ''
-    const sParts = startDate.split('-').map(Number)
-    const eParts = endDate.split('-').map(Number)
-    if (sParts[0] === eParts[0] && sParts[1] === eParts[1]) {
-      return formatMonthYear(sParts[1], sParts[0], language)
-    }
-    return `${formatMonthYear(sParts[1], sParts[0], language)} - ${formatMonthYear(eParts[1], eParts[0], language)}`
-  }
-
   return (
     <AppShell>
       <div className="page-container" id="laporan-print">
@@ -398,7 +394,7 @@ export default function LaporanPage() {
           {dashboardSummary && (
             <div style={{ marginBottom: 24, breakInside: 'avoid' }}>
               <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '0 0 8px 0', textTransform: 'uppercase', borderBottom: '1.5px solid #000', paddingBottom: 4 }}>
-                I. RINGKASAN ANGGARAN KAS
+                I. RINGKASAN ANGGARAN KAS ({formatMonthYear(selectedMonth, selectedYear, language)})
               </h4>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: 16 }}>
                 <thead>
@@ -409,11 +405,11 @@ export default function LaporanPage() {
                 </thead>
                 <tbody>
                   <tr style={{ borderBottom: '1px solid #cbd5e1' }}>
-                    <td style={{ padding: '6px 8px' }}>Total Alokasi Kas (Budget)</td>
+                    <td style={{ padding: '6px 8px' }}>Total Alokasi Kas ({formatMonthYear(selectedMonth, selectedYear, language)})</td>
                     <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{formatRupiah(dashboardSummary.totalBudget)}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #cbd5e1' }}>
-                    <td style={{ padding: '6px 8px' }}>Total Realisasi Pengeluaran</td>
+                    <td style={{ padding: '6px 8px' }}>Pengeluaran ({formatMonthYear(selectedMonth, selectedYear, language)})</td>
                     <td style={{ padding: '6px 8px', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>{formatRupiah(dashboardSummary.totalExpense)}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #000', fontWeight: 700, background: '#f8fafc' }}>
@@ -603,20 +599,26 @@ export default function LaporanPage() {
           </div>
         </div>
 
-        {/* Realisasi Anggaran Kas [NEW] */}
+        {/* Realisasi Anggaran Kas */}
         {dashboardSummary && (
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
-              <h3 className="card-title">📊 {t('budget_vs_realization')} ({formatPeriodLabel()})</h3>
+              <h3 className="card-title">
+                📊 {t('budget_vs_realization')} ({formatMonthYear(selectedMonth, selectedYear, language)}{!isSameMonth ? ` • Bulan Berjalan` : ''})
+              </h3>
             </div>
             <div className="card-body">
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '0.9rem', flexWrap: 'wrap', gap: 10 }}>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)' }}>{t('total_budget')}:</span>{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {isSameMonth ? t('total_budget') : `Total Kas (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
+                  </span>{' '}
                   <strong style={{ fontSize: '1.05rem' }}>{formatRupiah(dashboardSummary.totalBudget)}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)' }}>{t('total_expense')}:</span>{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {isSameMonth ? t('total_expense') : `Pengeluaran (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
+                  </span>{' '}
                   <strong style={{ fontSize: '1.05rem', color: '#ef4444' }}>{formatRupiah(dashboardSummary.totalExpense)}</strong>
                 </div>
                 <div>
