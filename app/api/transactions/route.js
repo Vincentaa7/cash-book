@@ -17,7 +17,11 @@ export async function GET(request) {
     const familyId = session.familyId || '1'
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page')) || 1)
-    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit')) || 20), 100)
+    const isAll = searchParams.get('all') === 'true' || searchParams.get('limit') === 'all' || searchParams.get('limit') === '-1'
+    const limitParam = searchParams.get('limit')
+    const limit = isAll
+      ? 10000
+      : Math.min(Math.max(1, parseInt(limitParam) || 20), 5000)
     const search = searchParams.get('search') || ''
     const category = searchParams.get('category') || ''
     const memberId = searchParams.get('memberId') || ''
@@ -82,18 +86,49 @@ export async function GET(request) {
       ]
     }
 
-    const [transactions, total] = await Promise.all([
+    let totalExpensePromise
+    let totalIncomePromise
+
+    if (category === 'pemasukan') {
+      totalExpensePromise = Promise.resolve({ _sum: { amount: 0 } })
+      totalIncomePromise = prisma.transaction.aggregate({
+        where,
+        _sum: { amount: true },
+      })
+    } else if (category) {
+      totalExpensePromise = prisma.transaction.aggregate({
+        where,
+        _sum: { amount: true },
+      })
+      totalIncomePromise = Promise.resolve({ _sum: { amount: 0 } })
+    } else {
+      totalExpensePromise = prisma.transaction.aggregate({
+        where: { ...where, category: { not: 'pemasukan' } },
+        _sum: { amount: true },
+      })
+      totalIncomePromise = prisma.transaction.aggregate({
+        where: { ...where, category: 'pemasukan' },
+        _sum: { amount: true },
+      })
+    }
+
+    const [transactions, total, expAgg, incAgg] = await Promise.all([
       prisma.transaction.findMany({
         where,
         include: {
           member: { select: { id: true, name: true, avatarColor: true } },
         },
         orderBy: orderClause,
-        skip,
-        take: limit,
+        ...(isAll ? {} : { skip, take: limit }),
       }),
       prisma.transaction.count({ where }),
+      totalExpensePromise,
+      totalIncomePromise,
     ])
+
+    const totalExpense = Number(expAgg?._sum?.amount || 0)
+    const totalIncome = Number(incAgg?._sum?.amount || 0)
+    const totalAmount = category === 'pemasukan' ? totalIncome : totalExpense
 
     return NextResponse.json({
       transactions: transactions.map(t => ({
@@ -101,8 +136,11 @@ export async function GET(request) {
         amount: Number(t.amount),
       })),
       total,
-      page,
-      totalPages: Math.ceil(total / limit),
+      totalExpense,
+      totalIncome,
+      totalAmount,
+      page: isAll ? 1 : page,
+      totalPages: isAll ? 1 : Math.ceil(total / limit),
     })
   } catch (error) {
     console.error('Get transactions error:', error)

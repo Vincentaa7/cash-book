@@ -41,7 +41,7 @@ export default function LaporanPage() {
   const todayParts = getJakartaDateParts()
   const todayStr = formatJakartaYMD(todayParts.year, todayParts.month, todayParts.day)
   const initStartStr = formatJakartaYMD(todayParts.year, todayParts.month, 1)
-  const initTxUrl = `/api/transactions?limit=500&startDate=${initStartStr}&endDate=${todayStr}`
+  const initTxUrl = `/api/transactions?all=true&startDate=${initStartStr}&endDate=${todayStr}`
 
   const [startDate, setStartDate] = useState(initStartStr)
   const [endDate, setEndDate] = useState(todayStr)
@@ -50,6 +50,7 @@ export default function LaporanPage() {
   const [data, setData] = useState(() => peekCache(initTxUrl))
   const [dashboardSummary, setDashboardSummary] = useState(
     () =>
+      peekCache(`/api/dashboard?summaryOnly=true&startDate=${initStartStr}&endDate=${todayStr}`)?.summary ||
       peekCache(`/api/dashboard?month=${todayParts.month}&year=${todayParts.year}&summaryOnly=true`)?.summary ||
       peekCache(`/api/dashboard?month=${todayParts.month}&year=${todayParts.year}`)?.summary ||
       null
@@ -66,15 +67,16 @@ export default function LaporanPage() {
       .catch(() => {})
   }, [])
 
-  async function fetchSummaryForMonth(m, y) {
+  async function fetchSummaryForPeriod(start, end) {
     try {
-      const fullDash = peekCache(`/api/dashboard?month=${m}&year=${y}`)
+      const url = `/api/dashboard?summaryOnly=true&startDate=${start}&endDate=${end}`
+      const fullDash = peekCache(url)
       if (fullDash?.summary) {
         setDashboardSummary(fullDash.summary)
         return
       }
-      const d = await cachedFetch(`/api/dashboard?month=${m}&year=${y}&summaryOnly=true`, { ttlMs: 30000 })
-      setDashboardSummary(d.summary)
+      const d = await cachedFetch(url, { ttlMs: 30000 })
+      if (d?.summary) setDashboardSummary(d.summary)
     } catch {}
   }
 
@@ -86,22 +88,24 @@ export default function LaporanPage() {
   }
 
   useEffect(() => {
+    if (startDate && endDate) {
+      fetchSummaryForPeriod(startDate, endDate)
+    }
     if (endDate) {
       const parts = endDate.split('-')
       if (parts.length >= 2) {
         const year = parseInt(parts[0], 10)
         const month = parseInt(parts[1], 10)
         if (!isNaN(year) && !isNaN(month)) {
-          fetchSummaryForMonth(month, year)
           fetchComparison(month, year)
         }
       }
     }
-  }, [endDate])
+  }, [startDate, endDate])
 
   async function handleSearch() {
     const params = new URLSearchParams({
-      limit: 500,
+      all: 'true',
       ...(startDate && { startDate }),
       ...(endDate && { endDate }),
       ...(memberId && { memberId }),
@@ -307,7 +311,7 @@ export default function LaporanPage() {
 
   const transactions = data?.transactions || []
   const expenseTransactions = transactions.filter(t => t.category !== 'pemasukan')
-  const totalExpense = expenseTransactions.reduce((s, t) => s + Number(t.amount), 0)
+  const totalExpense = data?.totalExpense !== undefined ? data.totalExpense : expenseTransactions.reduce((s, t) => s + Number(t.amount), 0)
 
   // 1. Rata-rata per transaksi [NEW]
   const avgTxAmount = expenseTransactions.length > 0 ? Math.round(totalExpense / expenseTransactions.length) : 0
@@ -361,16 +365,15 @@ export default function LaporanPage() {
     .map(([name, amt]) => ({ name, amount: amt }))
     .sort((a, b) => b.amount - a.amount)
 
-  const getSelectedMonthYear = () => {
-    if (!endDate) return { month: todayParts.month, year: todayParts.year }
-    const parts = endDate.split('-')
-    if (parts.length < 2) return { month: todayParts.month, year: todayParts.year }
-    const year = parseInt(parts[0], 10)
-    const month = parseInt(parts[1], 10)
-    if (isNaN(year) || isNaN(month)) return { month: todayParts.month, year: todayParts.year }
-    return { month, year }
+  const formatPeriodLabel = () => {
+    if (!startDate || !endDate) return ''
+    const sParts = startDate.split('-').map(Number)
+    const eParts = endDate.split('-').map(Number)
+    if (sParts[0] === eParts[0] && sParts[1] === eParts[1]) {
+      return formatMonthYear(sParts[1], sParts[0], language)
+    }
+    return `${formatMonthYear(sParts[1], sParts[0], language)} - ${formatMonthYear(eParts[1], eParts[0], language)}`
   }
-  const { month: selectedMonth, year: selectedYear } = getSelectedMonthYear()
 
   return (
     <AppShell>
@@ -604,7 +607,7 @@ export default function LaporanPage() {
         {dashboardSummary && (
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
-              <h3 className="card-title">📊 {t('budget_vs_realization')} ({formatMonthYear(selectedMonth, selectedYear, language)})</h3>
+              <h3 className="card-title">📊 {t('budget_vs_realization')} ({formatPeriodLabel()})</h3>
             </div>
             <div className="card-body">
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '0.9rem', flexWrap: 'wrap', gap: 10 }}>
@@ -657,7 +660,7 @@ export default function LaporanPage() {
               <div className="summary-card card-history">
                 <div className="summary-card-icon">📊</div>
                 <div className="summary-card-label">{t('history')}</div>
-                <div className="summary-card-value">{transactions.length}</div>
+                <div className="summary-card-value">{data?.total !== undefined ? data.total : transactions.length}</div>
                 <div className="summary-card-sub">{startDate} s/d {endDate}</div>
               </div>
 
@@ -903,7 +906,7 @@ export default function LaporanPage() {
             {/* Tabel Transaksi */}
             <div className="card" style={{ marginTop: 24 }}>
               <div className="card-header">
-                <h3 className="card-title">{t('history')} ({transactions.length})</h3>
+                <h3 className="card-title">{t('history')} ({data?.total !== undefined ? data.total : transactions.length})</h3>
                 <span style={{ fontWeight: 700, color: '#ef4444' }}>
                   Total: {formatRupiah(totalExpense)}
                 </span>

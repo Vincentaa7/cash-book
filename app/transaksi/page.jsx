@@ -22,6 +22,8 @@ export default function TransaksiPage() {
 
   const [transactions, setTransactions] = useState(() => initialTxCache?.transactions || [])
   const [total, setTotal] = useState(() => initialTxCache?.total || 0)
+  const [totalExpense, setTotalExpense] = useState(() => initialTxCache?.totalExpense || 0)
+  const [totalIncome, setTotalIncome] = useState(() => initialTxCache?.totalIncome || 0)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(() => initialTxCache?.totalPages || 1)
   const [loading, setLoading] = useState(() => !initialTxCache)
@@ -67,6 +69,8 @@ export default function TransaksiPage() {
     if (cached) {
       setTransactions(cached.transactions || [])
       setTotal(cached.total || 0)
+      setTotalExpense(cached.totalExpense ?? 0)
+      setTotalIncome(cached.totalIncome ?? 0)
       setTotalPages(cached.totalPages || 1)
       setLoading(false)
     } else {
@@ -77,6 +81,8 @@ export default function TransaksiPage() {
       const data = await cachedFetch(url, { ttlMs: 30000, forceRefresh })
       setTransactions(data.transactions || [])
       setTotal(data.total || 0)
+      setTotalExpense(data.totalExpense ?? 0)
+      setTotalIncome(data.totalIncome ?? 0)
       setTotalPages(data.totalPages || 1)
     } catch {}
     setLoading(false)
@@ -179,14 +185,17 @@ export default function TransaksiPage() {
         // Optimistic update: langsung hilangkan baris dari tabel
         setTransactions(prev => prev.filter(item => item.id !== targetId))
         setTotal(prev => Math.max(0, prev - 1))
+        if (deleteTx?.category === 'pemasukan') {
+          setTotalIncome(prev => Math.max(0, prev - Number(deleteTx.amount)))
+        } else if (deleteTx) {
+          setTotalExpense(prev => Math.max(0, prev - Number(deleteTx.amount)))
+        }
         invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
         fetchTransactions(true)
       }
     } catch {}
     setDeleteLoading(false)
   }
-
-  const totalFiltered = transactions.filter(t => t.category !== 'pemasukan').reduce((s, t) => s + Number(t.amount), 0)
 
   return (
     <AppShell>
@@ -289,13 +298,28 @@ export default function TransaksiPage() {
 
             {/* Summary filter */}
             {(startDate || endDate || search || category || memberId) && (
-              <div style={{ width: '100%', padding: '10px 0 0', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ width: '100%', padding: '10px 0 0', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                   {t('view_all')} {transactions.length} / {total} {t('history')}
                 </span>
-                <span style={{ fontWeight: 700, color: '#ef4444' }}>
-                  Total: {formatRupiah(totalFiltered)}
-                </span>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  {category === 'pemasukan' ? (
+                    <span style={{ fontWeight: 700, color: '#10b981' }}>
+                      Total: {formatRupiah(totalIncome)}
+                    </span>
+                  ) : (
+                    <>
+                      <span style={{ fontWeight: 700, color: '#ef4444' }}>
+                        Total: {formatRupiah(totalExpense)}
+                      </span>
+                      {totalIncome > 0 && !category && (
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#10b981' }}>
+                          (Pemasukan: {formatRupiah(totalIncome)})
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
