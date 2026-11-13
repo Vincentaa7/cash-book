@@ -5,7 +5,7 @@ import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { logActivity, getMonthRemainingBalance } from '@/lib/logger'
 import { formatRupiah } from '@/lib/format'
-import { getAppToday } from '@/lib/cashbook'
+import { getAppToday, syncBudgetsForTransactionChange } from '@/lib/cashbook'
 
 export async function GET(request) {
   try {
@@ -83,7 +83,7 @@ export async function POST(request) {
       }
 
       // Jalankan update kas & insert transaksi top-up secara paralel (1 round-trip!)
-      ;[budget] = await Promise.all([
+      const [updatedBudget, newTx] = await Promise.all([
         prisma.monthlyBudget.update({
           where: { uq_month_year: { familyId, month: parsedMonth, year: parsedYear } },
           data: {
@@ -103,6 +103,10 @@ export async function POST(request) {
           },
         }),
       ])
+      budget = updatedBudget
+
+      // Jika top-up dilakukan pada bulan lalu, propagasikan selisihnya ke bulan-bulan setelahnya
+      await syncBudgetsForTransactionChange(null, newTx, { skipBudgetForNew: true, familyId })
 
       // Catat log aktivitas di background tanpa menahan respons ke pengguna
       void (async () => {

@@ -148,7 +148,7 @@ export default function DashboardPage() {
               <div className="alert alert-warning" style={{ marginBottom: 24 }}>
                 <AlertTriangle size={16} />
                 <span>
-                  {t('expense')} {pct < 100 ? 100 - pct : 0}% {t('expense_ratio')} — {t('highest_expense')}!
+                  {t('budget_warning_alert')}
                 </span>
               </div>
             )}
@@ -187,7 +187,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="summary-card-sub">
                   {data?.summary?.totalBudget > 0
-                    ? `${t('success')}: ${100 - Math.min(100, pct)}%`
+                    ? `${100 - Math.min(100, pct)}% ${t('expense_ratio')}`
                     : t('set_budget_first')}
                 </div>
               </div>
@@ -361,7 +361,7 @@ export default function DashboardPage() {
                 <div className="empty-state">
                   <div className="empty-state-icon">📝</div>
                   <h3>{t('no_transactions')}</h3>
-                  <p>{t(' 디지털_cashbook ')}</p>
+                  <p>{t('digital_cashbook')}</p>
                   <Link href="/transaksi/baru" className="btn btn-primary" style={{ marginTop: 16 }}>
                     + {t('add_expense')}
                   </Link>

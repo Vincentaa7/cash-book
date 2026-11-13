@@ -37,6 +37,20 @@ export async function PUT(request, { params }) {
       },
     })
 
+    // Jika transaksi adalah Top-Up Saldo Utama, sesuaikan juga personalBudget bulan terkait
+    if (existing.itemName === 'Tambah Saldo (Top-Up)' && existing.type === 'income' && prisma.personalBudget) {
+      const oldDate = new Date(existing.date)
+      const oldMonth = oldDate.getUTCMonth() + 1
+      const oldYear = oldDate.getUTCFullYear()
+      const delta = BigInt(amount) - BigInt(existing.amount)
+      if (delta !== 0n) {
+        await prisma.personalBudget.updateMany({
+          where: { memberId: session.id, month: oldMonth, year: oldYear },
+          data: { amount: { increment: delta } },
+        })
+      }
+    }
+
     return NextResponse.json({ item: { ...updated, amount: Number(updated.amount) } })
   } catch (error) {
     console.error('PUT personal error:', error)
@@ -64,6 +78,18 @@ export async function DELETE(request, { params }) {
     }
 
     await prisma.personalTransaction.delete({ where: { id } })
+
+    // Jika transaksi yang dihapus adalah Top-Up Saldo Utama, kurangi juga personalBudget bulan terkait
+    if (existing.itemName === 'Tambah Saldo (Top-Up)' && existing.type === 'income' && prisma.personalBudget) {
+      const oldDate = new Date(existing.date)
+      const oldMonth = oldDate.getUTCMonth() + 1
+      const oldYear = oldDate.getUTCFullYear()
+      await prisma.personalBudget.updateMany({
+        where: { memberId: session.id, month: oldMonth, year: oldYear },
+        data: { amount: { decrement: BigInt(existing.amount) } },
+      })
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('DELETE personal error:', error)

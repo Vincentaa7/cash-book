@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { getAppToday } from '@/lib/cashbook'
 
 export async function GET(request) {
   try {
@@ -148,25 +149,25 @@ export async function GET(request) {
       .reduce((sum, t) => sum + Number(t.amount), 0)
     const remaining = totalBudget - totalExpense
 
-    // Rata-rata per hari (berdasarkan hari yang sudah berlalu)
-    const today = new Date()
+    // Rata-rata per hari (berdasarkan hari yang sudah berlalu di zona waktu aplikasi)
+    const appToday = getAppToday()
+    const daysInMonth = lastDay.getUTCDate()
     const daysElapsed = Math.max(
       1,
-      today.getMonth() + 1 === month && today.getFullYear() === year
-        ? today.getDate()
-        : lastDay.getDate()
+      appToday.month === month && appToday.year === year
+        ? appToday.day
+        : daysInMonth
     )
     const avgPerDay = Math.round(totalExpense / daysElapsed)
 
     // Pengeluaran per hari (untuk bar chart)
     const expenseByDay = {}
-    const daysInMonth = lastDay.getDate()
     for (let d = 1; d <= daysInMonth; d++) {
       expenseByDay[d] = 0
     }
     transactions.forEach(t => {
       if (t.category !== 'pemasukan') {
-        const day = new Date(t.transactionDate).getDate()
+        const day = new Date(t.transactionDate).getUTCDate()
         expenseByDay[day] = (expenseByDay[day] || 0) + Number(t.amount)
       }
     })

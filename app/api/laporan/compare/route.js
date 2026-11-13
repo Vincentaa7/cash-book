@@ -114,6 +114,7 @@ export async function GET(request) {
       changePercent,
       changeTrend,
       months6,
+      history: months6,
     })
   } catch (error) {
     console.error('Compare error:', error)

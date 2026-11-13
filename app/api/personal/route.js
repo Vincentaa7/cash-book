@@ -21,16 +21,16 @@ export async function GET(request) {
     const start    = searchParams.get('startDate')|| ''
     const end      = searchParams.get('endDate')  || ''
 
-    // Tentukan range tanggal
+    // Tentukan range tanggal (UTC agar tanggal 1 pukul 00:00:00Z tidak terlewat akibat offset zona waktu lokal)
     let dateFilter = {}
     if (month && year) {
-      const firstDay = new Date(year, month - 1, 1)
-      const lastDay  = new Date(year, month, 0, 23, 59, 59, 999)
+      const firstDay = new Date(Date.UTC(year, month - 1, 1))
+      const lastDay  = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
       dateFilter = { gte: firstDay, lte: lastDay }
     } else if (start || end) {
       dateFilter = {
         ...(start && { gte: new Date(start) }),
-        ...(end   && { lte: new Date(end + 'T23:59:59') }),
+        ...(end   && { lte: new Date(end + 'T23:59:59.999Z') }),
       }
     }
 
@@ -46,13 +46,13 @@ export async function GET(request) {
     const periodWhere = {
       memberId: session.id,
       date: {
-        gte: new Date(curYear, curMonth - 1, 1),
-        lte: new Date(curYear, curMonth, 0, 23, 59, 59, 999),
+        gte: new Date(Date.UTC(curYear, curMonth - 1, 1)),
+        lte: new Date(Date.UTC(curYear, curMonth, 0, 23, 59, 59, 999)),
       },
     }
 
     // Eksekusi seluruh query buku kas pribadi dalam 1 batch paralel (1 round-trip ke database!)
-    const [items, total, personalBudgetResult, periodGrouped] = await Promise.all([
+    const [items, total, personalBudgetResult, periodGrouped, topupAgg] = await Promise.all([
       prisma.personalTransaction.findMany({
         where,
         orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
@@ -80,6 +80,14 @@ export async function GET(request) {
         where: periodWhere,
         _sum: { amount: true },
       }),
+      prisma.personalTransaction.aggregate({
+        where: {
+          ...periodWhere,
+          type: 'income',
+          itemName: 'Tambah Saldo (Top-Up)',
+        },
+        _sum: { amount: true },
+      }),
     ])
 
     let budgetAmount = 0
@@ -95,18 +103,21 @@ export async function GET(request) {
       if (grp.type === 'expense') totalExpense += Number(grp._sum.amount || 0)
       if (grp.type === 'income') totalIncome += Number(grp._sum.amount || 0)
     }
+    const topupIncome = Number(topupAgg?._sum?.amount || 0)
+    const extraIncome = Math.max(0, totalIncome - topupIncome)
 
     // Sisa saldo kalkulasi:
-    // Jika ada Saldo Utama: Sisa Saldo = Saldo Utama - Total Pengeluaran
+    // Jika ada Saldo Utama: Sisa Saldo = Saldo Utama (sudah termasuk Top-Up) + Pemasukan Tambahan - Total Pengeluaran
     // Jika tidak ada Saldo Utama: Sisa Saldo = Total Pemasukan - Total Pengeluaran
     let balance = 0
+    const effectiveBudget = budgetAmount + extraIncome
     if (budgetAmount > 0) {
-      balance = budgetAmount - totalExpense
+      balance = effectiveBudget - totalExpense
     } else {
       balance = totalIncome - totalExpense
     }
 
-    const usagePercent = budgetAmount > 0 ? Math.min(100, Math.round((totalExpense / budgetAmount) * 100)) : 0
+    const usagePercent = effectiveBudget > 0 ? Math.min(100, Math.round((totalExpense / effectiveBudget) * 100)) : 0
 
     return NextResponse.json({
       items: items.map(i => ({ ...i, amount: Number(i.amount) })),

@@ -123,7 +123,7 @@ export default function NewTransactionPage() {
             justifyContent: 'center', minHeight: '60vh', textAlign: 'center',
           }}>
             <div style={{ fontSize: '4rem', marginBottom: 16 }}>✅</div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 8 }}>{t('save')} {t('reports')}!</h2>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 8 }}>{t('add_expense')} — {t('success')}!</h2>
             <p style={{ color: 'var(--text-muted)' }}>{t('digital_cashbook')}</p>
           </div>
         </div>
@@ -155,8 +155,8 @@ export default function NewTransactionPage() {
             >
               <span style={{ flex: '0 0 auto', fontSize: '1.15rem', lineHeight: 1 }}>💰</span>
               <span style={{ flex: 1 }}>
-                {t('total_expense')}: <strong>{formatRupiah(remaining)}</strong>
-                {remaining <= 0 && ` — ${t('no_transactions')}`}
+                {t('balance')}: <strong>{formatRupiah(remaining)}</strong>
+                {remaining <= 0 && ` — ${t('budget_depleted_alert')}`}
               </span>
             </div>
           )}
@@ -252,7 +252,7 @@ export default function NewTransactionPage() {
                   {willExceed && (
                     <div className="form-error" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <AlertCircle size={13} />
-                      {t('no_transactions')} ({formatRupiah(remaining)})!
+                      Nominal melebihi {t('balance').toLowerCase()} ({formatRupiah(remaining)})!
                     </div>
                   )}
                 </div>
@@ -307,7 +307,7 @@ export default function NewTransactionPage() {
                 {/* Catatan */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="tx-notes">
-                    {t('notes')} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({t('cancel').toLowerCase()})</span>
+                    {t('notes')} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opsional)</span>
                   </label>
                   <textarea
                     id="tx-notes"
@@ -343,11 +343,11 @@ export default function NewTransactionPage() {
           <div className="modal-overlay">
             <div className="modal">
               <div className="modal-header">
-                <h3 className="modal-title">{t('edit')}</h3>
+                <h3 className="modal-title">Konfirmasi {t('add_expense')}</h3>
                 <button className="btn-icon" onClick={() => setShowConfirm(false)}>✕</button>
               </div>
               <div className="modal-body">
-                <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>{t('system_menu')}</p>
+                <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>Pastikan rincian pengeluaran di bawah ini sudah benar:</p>
                 <div style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 16 }}>
                   <div style={{ display: 'grid', gap: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -371,7 +371,7 @@ export default function NewTransactionPage() {
                 {willExceed && (
                   <div className="alert alert-warning" style={{ marginTop: 16 }}>
                     <AlertCircle size={16} />
-                    <span>{t('no_transactions')}</span>
+                    <span>{t('budget_depleted_alert')}</span>
                   </div>
                 )}
               </div>

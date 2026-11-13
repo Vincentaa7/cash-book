@@ -330,7 +330,7 @@ export default function LaporanPage() {
   const dayExpenses = Array(7).fill(0)
   expenseTransactions.forEach(t => {
     const d = new Date(t.transactionDate)
-    const dayIndex = d.getDay()
+    const dayIndex = d.getUTCDay()
     dayExpenses[dayIndex] += Number(t.amount)
   })
 
@@ -541,7 +541,7 @@ export default function LaporanPage() {
           <div className="card-body">
             <div className="filter-bar" style={{ border: 'none', background: 'transparent', padding: 0 }}>
               <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                <label className="form-label" style={{ fontSize: '0.8rem' }}>{t('date')} ({t('history').toLowerCase()})</label>
+                <label className="form-label" style={{ fontSize: '0.8rem' }}>Dari {t('date')}</label>
                 <input
                   type="date"
                   className="form-input"
@@ -550,7 +550,7 @@ export default function LaporanPage() {
                 />
               </div>
               <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                <label className="form-label" style={{ fontSize: '0.8rem' }}>{t('date')} ({t('total').toLowerCase()})</label>
+                <label className="form-label" style={{ fontSize: '0.8rem' }}>Sampai {t('date')}</label>
                 <input
                   type="date"
                   className="form-input"
@@ -809,7 +809,7 @@ export default function LaporanPage() {
             </div>
 
             {/* Grafik Perbandingan 6 Bulan */}
-            {compareData && compareData.history && (
+            {compareData && (compareData.history || compareData.months6) && (
               <div className="card" style={{ marginTop: 24 }}>
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: 8 }}>
                   <h3 className="card-title">📊 Tren 6 Bulan Terakhir</h3>
@@ -865,7 +865,7 @@ export default function LaporanPage() {
                   <div style={{ height: 240, width: '100%' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={compareData.history.map((h, idx) => ({
+                        data={(compareData.history || compareData.months6).map((h, idx) => ({
                           name: formatMonthYear(h.month, h.year, language).slice(0, 8),
                           amount: h.amount,
                           isCurrent: idx === 5,
@@ -880,7 +880,7 @@ export default function LaporanPage() {
                           contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', borderRadius: 8, color: 'var(--text-primary)', fontSize: '0.8rem' }}
                         />
                         <Bar dataKey="amount" radius={[6, 6, 0, 0]} maxBarSize={48}>
-                          {compareData.history.map((_, idx) => (
+                          {(compareData.history || compareData.months6).map((_, idx) => (
                             <Cell key={idx} fill={idx === 5 ? 'var(--color-primary-500)' : idx === 4 ? '#94a3b8' : '#cbd5e1'} />
                           ))}
                         </Bar>
@@ -943,7 +943,7 @@ export default function LaporanPage() {
                             </div>
                           </td>
                           <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
-                          <td style={{ fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap' }}>{formatRupiah(t.amount)}</td>
+                          <td style={{ fontWeight: 700, color: t.category === 'pemasukan' ? 'var(--color-success)' : '#ef4444', whiteSpace: 'nowrap' }}>{formatRupiah(t.amount)}</td>
                           <td className="hide-on-mobile" style={{ fontSize: '0.85rem' }}>{t.member?.name || '-'}</td>
                           <td className="hide-on-mobile" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.notes || '-'}</td>
                         </tr>

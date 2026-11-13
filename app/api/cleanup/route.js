@@ -59,9 +59,9 @@ export async function GET(request) {
     const monthMap = {}
     oldTransactions.forEach(tx => {
       const d = new Date(tx.transactionDate)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
       if (!monthMap[key]) {
-        monthMap[key] = { month: d.getMonth() + 1, year: d.getFullYear(), count: 0, total: 0 }
+        monthMap[key] = { month: d.getUTCMonth() + 1, year: d.getUTCFullYear(), count: 0, total: 0 }
       }
       monthMap[key].count += 1
       monthMap[key].total += Number(tx.amount)
@@ -123,8 +123,8 @@ export async function POST(request) {
     const snapshotMap = {}
     oldTransactions.forEach(tx => {
       const d = new Date(tx.transactionDate)
-      const month = d.getMonth() + 1
-      const year = d.getFullYear()
+      const month = d.getUTCMonth() + 1
+      const year = d.getUTCFullYear()
       const key = `${year}-${month}-${tx.category}`
 
       if (!snapshotMap[key]) {

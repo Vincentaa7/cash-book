@@ -64,9 +64,10 @@ export async function POST(request) {
     let resultAmount = Number(parsedAmount)
 
     if (action === 'add') {
-      let txDate = new Date()
-      if (txDate.getMonth() + 1 !== parsedMonth || txDate.getFullYear() !== parsedYear) {
-        txDate = new Date(parsedYear, parsedMonth - 1, 1)
+      const now = new Date()
+      let txDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+      if (now.getMonth() + 1 !== parsedMonth || now.getFullYear() !== parsedYear) {
+        txDate = new Date(Date.UTC(parsedYear, parsedMonth - 1, 1))
       }
 
       // Top-up: Jalankan upsert saldo utama & pencatatan transaksi masuk secara paralel (1 round-trip!)

@@ -555,7 +555,7 @@ export default function TransaksiPage() {
             </div>
             <div className="modal-body">
               <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-                {t('no_transactions')}?
+                {t('personal_confirm_delete')}
               </p>
               <div style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 14 }}>
                 <div style={{ fontWeight: 600 }}>{deleteTx.itemName}</div>

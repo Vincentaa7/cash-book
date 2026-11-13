@@ -72,7 +72,7 @@ export default function CalendarPage() {
 
   transactions.forEach(t => {
     const dateObj = new Date(t.transactionDate)
-    const day = dateObj.getDate()
+    const day = dateObj.getUTCDate()
     if (dayStats[day]) {
       dayStats[day].items.push(t)
       if (t.category === 'pemasukan') {
