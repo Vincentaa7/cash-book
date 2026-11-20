@@ -61,7 +61,7 @@ export async function GET(request) {
 
     // 1b. Jika kas bulan ini SUDAH diatur (manual), jangan tampilkan popup
     if (currentBudget) {
-      void prisma.appSettings.update({
+      await prisma.appSettings.update({
         where: { id: familyId },
         data: { lastCarryOverMonth: currentMonthStr },
       }).catch(() => {})

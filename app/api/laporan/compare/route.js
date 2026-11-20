@@ -25,11 +25,6 @@ export async function GET(request) {
     const month = parseInt(searchParams.get('month')) || now.getMonth() + 1
     const year = parseInt(searchParams.get('year')) || now.getFullYear()
 
-    // Cutoff date untuk arsip (90 hari)
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - 90)
-    cutoffDate.setHours(0, 0, 0, 0)
-
     const monthsList = []
     for (let i = -5; i <= 0; i++) {
       monthsList.push(offsetMonth(month, year, i))
@@ -81,12 +76,11 @@ export async function GET(request) {
       snapByMonth[k] = (snapByMonth[k] || 0) + Number(snap.totalAmount)
     }
 
+    // Karena arsip snapshot hanya berisi transaksi yang sudah dihapus oleh cleanup,
+    // total tiap bulan yang 100% akurat selalu: transaksi aktif + snapshot arsip (aman untuk arsip parsial!)
     const months6 = monthsList.map(({ month: m, year: y }) => {
-      const lastDay = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999))
       const key = `${y}-${m}`
-      const amount = lastDay < cutoffDate
-        ? (snapByMonth[key] || txByMonth[key] || 0)
-        : (txByMonth[key] || 0)
+      const amount = (txByMonth[key] || 0) + (snapByMonth[key] || 0)
       return { month: m, year: y, amount }
     })
 

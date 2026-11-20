@@ -1,4 +1,4 @@
-// app/api/transactions/[id]/route.js - Edit & Delete Transaction
+// app/api/transactions/[id]/route.js - Edit & Delete Transaction (Atomic + Reliable Audit Log)
 
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
@@ -16,92 +16,97 @@ export async function PUT(request, { params }) {
 
     const familyId = session.familyId || '1'
     const { id } = await params
-    const transaction = await prisma.transaction.findUnique({ where: { id } })
-
-    if (!transaction || transaction.familyId !== familyId) {
-      return NextResponse.json({ error: 'Transaksi tidak ditemukan' }, { status: 404 })
-    }
-
-    // Cek akses: admin bisa edit semua, member hanya edit miliknya dalam 24 jam
-    const isAdmin = session.role === 'admin' || session.role !== undefined && session.role === 'superadmin'
-    const isOwner = transaction.memberId === session.id
-    const isWithin24h = (Date.now() - new Date(transaction.createdAt).getTime()) < 24 * 60 * 60 * 1000
-
-    if (!isAdmin && (!isOwner || !isWithin24h)) {
-      return NextResponse.json(
-        { error: 'Anda hanya bisa edit transaksi milik sendiri dalam 24 jam' },
-        { status: 403 }
-      )
-    }
-
     const { itemName, amount, category, transactionDate, notes } = await request.json()
+
+    const cleanItemName = typeof itemName === 'string' ? itemName.trim() : ''
     const numericAmount = Number(amount)
     const txDate = new Date(transactionDate)
 
-    // Jalankan update transaksi & sinkronisasi kas secara paralel
-    const [updated, adjustedMonths] = await Promise.all([
-      prisma.transaction.update({
+    if (!cleanItemName || !category || !transactionDate || Number.isNaN(txDate.getTime())) {
+      return NextResponse.json({ error: 'Data transaksi tidak lengkap atau tanggal tidak valid' }, { status: 400 })
+    }
+
+    if (!Number.isSafeInteger(numericAmount) || numericAmount <= 0) {
+      return NextResponse.json({ error: 'Jumlah harus berupa bilangan bulat lebih dari 0' }, { status: 400 })
+    }
+
+    const isAdmin = session.role === 'admin' || session.role === 'superadmin'
+
+    // Baca data lama, validasi hak akses, update, dan sinkronkan kas dalam 1 transaksi atomik
+    const txResult = await prisma.$transaction(async (tx) => {
+      const existing = await tx.transaction.findUnique({ where: { id } })
+      if (!existing || existing.familyId !== familyId) {
+        return { error: 'Transaksi tidak ditemukan', status: 404 }
+      }
+
+      const isOwner = existing.memberId === session.id
+      const isWithin24h = (Date.now() - new Date(existing.createdAt).getTime()) < 24 * 60 * 60 * 1000
+      if (!isAdmin && (!isOwner || !isWithin24h)) {
+        return { error: 'Anda hanya bisa edit transaksi milik sendiri dalam 24 jam', status: 403 }
+      }
+
+      // Lindungi transaksi Top-Up agar tidak bisa secara tidak sengaja berubah kategori menjadi pengeluaran (dan sebaliknya)
+      const safeCategory = existing.category === 'pemasukan' ? 'pemasukan' : (category === 'pemasukan' ? existing.category : category)
+
+      const updated = await tx.transaction.update({
         where: { id },
         data: {
-          itemName,
+          itemName: cleanItemName,
           amount: BigInt(numericAmount),
-          category,
+          category: safeCategory,
           transactionDate: txDate,
-          notes: notes || null,
+          notes: typeof notes === 'string' && notes.trim() ? notes.trim() : null,
           editedById: session.id,
           editedByName: session.name,
         },
         include: {
           member: { select: { id: true, name: true, avatarColor: true } },
         },
-      }),
-      syncBudgetsForTransactionChange(transaction, {
-        familyId,
-        amount: numericAmount,
-        category,
-        transactionDate: txDate,
-      }),
-    ])
+      })
 
-    // Hitung sisa saldo & catat log aktivitas di background tanpa menahan respons UI
+      const adjustedMonths = await syncBudgetsForTransactionChange(existing, updated, { db: tx })
+      return { transaction: existing, updated, adjustedMonths, safeCategory }
+    })
+
+    if (txResult.error) {
+      return NextResponse.json({ error: txResult.error }, { status: txResult.status })
+    }
+
+    const { transaction, updated, adjustedMonths, safeCategory } = txResult
+
+    // WAJIB di-await sebelum return agar audit log 100% tersimpan di Vercel Serverless
     const txMonth = txDate.getUTCMonth() + 1
     const txYear = txDate.getUTCFullYear()
-    void (async () => {
-      try {
-        const remainingBalance = await getMonthRemainingBalance(txMonth, txYear, familyId)
-        const balanceText =
-          (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
-          (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
+    const remainingBalance = await getMonthRemainingBalance(txMonth, txYear, familyId)
+    const balanceText =
+      (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
+      (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
-        await logActivity({
-          action: 'TRANSACTION_UPDATE',
-          description: `${session.name} mengubah transaksi "${transaction.itemName}" (${formatRupiah(transaction.amount)}) menjadi "${itemName}" (${formatRupiah(numericAmount)})${balanceText}`,
-          details: {
-            id,
-            old: {
-              itemName: transaction.itemName,
-              amount: Number(transaction.amount),
-              category: transaction.category,
-              transactionDate: transaction.transactionDate.toISOString().split('T')[0],
-              notes: transaction.notes,
-            },
-            new: {
-              itemName,
-              amount: numericAmount,
-              category,
-              transactionDate,
-              notes,
-            },
-            remainingBalance,
-            adjustedMonths,
-          },
-          memberId: session.id,
-          familyId,
-        })
-      } catch (err) {
-        console.error('Background logActivity update error:', err)
-      }
-    })()
+    await logActivity({
+      action: 'TRANSACTION_UPDATE',
+      description: `${session.name} mengubah transaksi "${transaction.itemName}" (${formatRupiah(transaction.amount)}) menjadi "${cleanItemName}" (${formatRupiah(numericAmount)})${balanceText}`,
+      details: {
+        id,
+        old: {
+          itemName: transaction.itemName,
+          amount: Number(transaction.amount),
+          category: transaction.category,
+          transactionDate: transaction.transactionDate.toISOString().split('T')[0],
+          notes: transaction.notes,
+        },
+        new: {
+          itemName: cleanItemName,
+          amount: numericAmount,
+          category: safeCategory,
+          transactionDate,
+          notes: updated.notes,
+        },
+        remainingBalance,
+        adjustedMonths,
+      },
+      memberId: session.id,
+      familyId,
+    })
 
     return NextResponse.json({
       transaction: { ...updated, amount: Number(updated.amount) },
@@ -121,51 +126,57 @@ export async function DELETE(request, { params }) {
 
     const familyId = session.familyId || '1'
     const { id } = await params
-    const transaction = await prisma.transaction.findUnique({
-      where: { id },
+
+    // Eksekusi hapus terlebih dahulu secara atomik; jika sudah terhapus (double-click),
+    // deleteMany mengembalikan count === 0 sehingga syncBudgets TIDAK dijalankan dua kali!
+    const txResult = await prisma.$transaction(async (tx) => {
+      const existing = await tx.transaction.findUnique({ where: { id } })
+      if (!existing || existing.familyId !== familyId) {
+        return { error: 'Transaksi tidak ditemukan', status: 404 }
+      }
+
+      const deleted = await tx.transaction.deleteMany({
+        where: { id, familyId },
+      })
+      if (deleted.count === 0) {
+        return { error: 'Transaksi sudah dihapus sebelumnya', status: 404 }
+      }
+
+      const adjustedMonths = await syncBudgetsForTransactionChange(existing, null, { db: tx })
+      return { transaction: existing, adjustedMonths }
     })
 
-    if (!transaction || transaction.familyId !== familyId) {
-      return NextResponse.json({ error: 'Transaksi tidak ditemukan' }, { status: 404 })
+    if (txResult.error) {
+      return NextResponse.json({ error: txResult.error }, { status: txResult.status })
     }
 
-    // Hapus transaksi & sinkronkan kas secara paralel
-    const [, adjustedMonths] = await Promise.all([
-      prisma.transaction.delete({ where: { id } }),
-      syncBudgetsForTransactionChange(transaction, null),
-    ])
+    const { transaction, adjustedMonths } = txResult
 
-    // Hitung sisa saldo & catat log aktivitas hapus di background
+    // WAJIB di-await sebelum return agar audit log 100% tersimpan di Vercel Serverless
     const delDate = new Date(transaction.transactionDate)
     const delMonth = delDate.getUTCMonth() + 1
     const delYear = delDate.getUTCFullYear()
-    void (async () => {
-      try {
-        const remainingBalance = await getMonthRemainingBalance(delMonth, delYear, familyId)
-        const balanceText =
-          (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
-          (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
+    const remainingBalance = await getMonthRemainingBalance(delMonth, delYear, familyId)
+    const balanceText =
+      (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
+      (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
-        await logActivity({
-          action: 'TRANSACTION_DELETE',
-          description: `${session.name} menghapus transaksi "${transaction.itemName}" sebesar ${formatRupiah(transaction.amount)}${balanceText}`,
-          details: {
-            id,
-            itemName: transaction.itemName,
-            amount: Number(transaction.amount),
-            category: transaction.category,
-            transactionDate: transaction.transactionDate.toISOString().split('T')[0],
-            notes: transaction.notes,
-            remainingBalance,
-            adjustedMonths,
-          },
-          memberId: session.id,
-          familyId,
-        })
-      } catch (err) {
-        console.error('Background logActivity delete error:', err)
-      }
-    })()
+    await logActivity({
+      action: 'TRANSACTION_DELETE',
+      description: `${session.name} menghapus transaksi "${transaction.itemName}" sebesar ${formatRupiah(transaction.amount)}${balanceText}`,
+      details: {
+        id,
+        itemName: transaction.itemName,
+        amount: Number(transaction.amount),
+        category: transaction.category,
+        transactionDate: transaction.transactionDate.toISOString().split('T')[0],
+        notes: transaction.notes,
+        remainingBalance,
+        adjustedMonths,
+      },
+      memberId: session.id,
+      familyId,
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

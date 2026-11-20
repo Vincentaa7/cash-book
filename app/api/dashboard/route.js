@@ -24,7 +24,7 @@ export async function GET(request) {
     const lastDay = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
 
     if (summaryOnly) {
-      const [budget, transactions] = await Promise.all([
+      const [budget, transactions, archivedExp] = await Promise.all([
         prisma.monthlyBudget.findUnique({
           where: { uq_month_year: { familyId, month, year } },
         }),
@@ -36,10 +36,19 @@ export async function GET(request) {
           },
           _sum: { amount: true },
         }),
+        prisma.monthlySnapshot.aggregate({
+          where: {
+            familyId,
+            month,
+            year,
+            category: { not: 'pemasukan' },
+          },
+          _sum: { totalAmount: true },
+        }),
       ])
 
       const totalBudget = budget ? Number(budget.amount) : 0
-      const totalExpense = Number(transactions._sum.amount || 0)
+      const totalExpense = Number(transactions._sum.amount || 0) + Number(archivedExp._sum.totalAmount || 0)
       const remaining = totalBudget - totalExpense
 
       return NextResponse.json({
@@ -111,7 +120,7 @@ export async function GET(request) {
         },
       }),
 
-      // 5. Snapshot arsip 6 bulan terakhir
+      // 5. Snapshot arsip 6 bulan terakhir (termasuk category untuk pie chart bulan terarsip)
       prisma.monthlySnapshot.findMany({
         where: {
           familyId,
@@ -121,6 +130,7 @@ export async function GET(request) {
         select: {
           month: true,
           year: true,
+          category: true,
           totalAmount: true,
         },
       }),
@@ -143,10 +153,15 @@ export async function GET(request) {
     const currentBudgetObj = sixMonthBudgets.find(b => b.month === month && b.year === year)
     const totalBudget = currentBudgetObj ? Number(currentBudgetObj.amount) : 0
 
-    // Hitung total pengeluaran bulan ini
-    const totalExpense = transactions
+    // Snapshot arsip bulan aktif (jika pernah diarsipkan sebagian/seluruhnya via cleanup > 90 hari)
+    const currentMonthSnapshots = sixMonthSnapshots.filter(s => s.month === month && s.year === year)
+    const archivedExpenseCurrentMonth = currentMonthSnapshots.reduce((sum, s) => sum + Number(s.totalAmount), 0)
+
+    // Hitung total pengeluaran bulan ini = Transaksi Aktif + Arsip Snapshot (selalu saling eksklusif)
+    const activeExpenseCurrentMonth = transactions
       .filter(t => t.category !== 'pemasukan')
       .reduce((sum, t) => sum + Number(t.amount), 0)
+    const totalExpense = activeExpenseCurrentMonth + archivedExpenseCurrentMonth
     const remaining = totalBudget - totalExpense
 
     // Rata-rata per hari (berdasarkan hari yang sudah berlalu di zona waktu aplikasi)
@@ -177,12 +192,17 @@ export async function GET(request) {
       amount,
     }))
 
-    // Pengeluaran per kategori (untuk pie/donut chart)
+    // Pengeluaran per kategori (gabungkan transaksi aktif + arsip snapshot bulan aktif)
     const categoryMap = {}
     transactions.forEach(t => {
       if (t.category !== 'pemasukan') {
         const cat = t.category
         categoryMap[cat] = (categoryMap[cat] || 0) + Number(t.amount)
+      }
+    })
+    currentMonthSnapshots.forEach(s => {
+      if (s.category !== 'pemasukan') {
+        categoryMap[s.category] = (categoryMap[s.category] || 0) + Number(s.totalAmount)
       }
     })
     const expenseByCategory = Object.entries(categoryMap)
@@ -208,20 +228,11 @@ export async function GET(request) {
       budgetByMonthKey[`${b.year}-${b.month}`] = Number(b.amount)
     }
 
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - 90)
-    cutoffDate.setHours(0, 0, 0, 0)
-
+    // Karena cleanup memindahkan transaksi terhapus ke monthly_snapshots (saling eksklusif),
+    // total pengeluaran bulanan yang tepat selalu merupakan penjumlahan: transaksi aktif + arsip snapshot
     const monthlyTrends = monthsToQuery.map(({ m, y }) => {
-      const mLastDay = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999))
       const key = `${y}-${m}`
-      let expenseAmount = 0
-
-      if (mLastDay < cutoffDate) {
-        expenseAmount = snapSumByMonthKey[key] || txSumByMonthKey[key] || 0
-      } else {
-        expenseAmount = txSumByMonthKey[key] || 0
-      }
+      const expenseAmount = (txSumByMonthKey[key] || 0) + (snapSumByMonthKey[key] || 0)
 
       return {
         month: m,

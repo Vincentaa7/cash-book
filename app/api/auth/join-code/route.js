@@ -161,8 +161,8 @@ export async function POST(request) {
       isNewMember = true
     }
 
-    // 6. Catat di Activity Log keluarga tersebut secara non-blocking agar respon login instan
-    logActivity({
+    // 6. Catat di Activity Log keluarga (di-await agar tidak terpotong Vercel Serverless)
+    await logActivity({
       familyId: family.id,
       action: isNewMember ? 'MEMBER_CREATE' : 'MEMBER_LOGIN_CODE',
       description: isNewMember
@@ -170,7 +170,7 @@ export async function POST(request) {
         : `${member.name} masuk kembali ke Cash Book "${family.familyName}" menggunakan Kode Khusus Keluarga`,
       details: { id: member.id, name: member.name, joinedViaCode: true, isNewMember },
       memberId: member.id,
-    }).catch(() => {})
+    })
 
     // 7. Langsung login otomatis ke Cash Book keluarga tersebut
     const token = await signToken({

@@ -1,4 +1,4 @@
-// app/api/budget/transfer/route.js
+// app/api/budget/transfer/route.js - Pindah Sisa Kas Antar Bulan (Atomic + Reliable Audit Log)
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
@@ -40,7 +40,7 @@ export async function POST(request) {
         where: { id: familyId },
         data: { lastCarryOverMonth: currentMonthStr },
       })
-      void logActivity({
+      await logActivity({
         action: 'BUDGET_UPDATE',
         description: `${session.name} menolak pemindahan sisa kas bulan lalu ke ${month}/${year}`,
         details: { month, year, action: 'reject', existingBudget: existingBudget ? Number(existingBudget.amount) : null },
@@ -66,40 +66,49 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Tidak ada sisa saldo bulan lalu untuk dipindahkan' }, { status: 400 })
     }
 
-    // Buat kas bulan baru & tandai sudah diproses secara paralel (1 round-trip!)
-    await Promise.all([
-      prisma.monthlyBudget.create({
-        data: {
-          familyId,
-          month,
-          year,
-          amount: BigInt(amount),
-          createdBy: session.id,
-        },
-      }),
-      prisma.appSettings.update({
-        where: { id: familyId },
-        data: { lastCarryOverMonth: currentMonthStr },
-      }),
-    ])
-
-    // Catat log aktivitas pindah saldo di background
-    void (async () => {
-      try {
-        const remainingBalance = await getMonthRemainingBalance(month, year, familyId)
-        const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
-
-        await logActivity({
-          action: 'BUDGET_UPDATE',
-          description: `${session.name} memindahkan sisa kas ${prevMonth}/${prevYear} sebesar ${formatRupiah(amount)} ke kas bulan ${month}/${year}${balanceText}`,
-          details: { month, year, prevMonth, prevYear, amount, action: 'agree', totalBudget: amount, remainingBalance },
-          memberId: session.id,
-          familyId,
-        })
-      } catch (err) {
-        console.error('Background carryover log error:', err)
+    // Buat kas bulan baru & tandai sudah diproses secara atomik dalam $transaction
+    try {
+      await prisma.$transaction([
+        prisma.monthlyBudget.create({
+          data: {
+            familyId,
+            month,
+            year,
+            amount: BigInt(amount),
+            createdBy: session.id,
+          },
+        }),
+        prisma.appSettings.update({
+          where: { id: familyId },
+          data: { lastCarryOverMonth: currentMonthStr },
+        }),
+      ])
+    } catch (txErr) {
+      // Tangani klik bersamaan oleh 2 admin (Unique constraint uq_month_year)
+      if (txErr?.code === 'P2002') {
+        await prisma.appSettings.update({
+          where: { id: familyId },
+          data: { lastCarryOverMonth: currentMonthStr },
+        }).catch(() => {})
+        return NextResponse.json(
+          { error: 'Kas bulan ini sudah diatur oleh admin lain. Pindahan saldo dibatalkan agar tidak ganda.' },
+          { status: 409 }
+        )
       }
-    })()
+      throw txErr
+    }
+
+    // WAJIB di-await sebelum return agar audit log 100% tersimpan di Vercel Serverless
+    const remainingBalance = await getMonthRemainingBalance(month, year, familyId)
+    const balanceText = remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : ''
+
+    await logActivity({
+      action: 'BUDGET_UPDATE',
+      description: `${session.name} memindahkan sisa kas ${prevMonth}/${prevYear} sebesar ${formatRupiah(amount)} ke kas bulan ${month}/${year}${balanceText}`,
+      details: { month, year, prevMonth, prevYear, amount, action: 'agree', totalBudget: amount, remainingBalance },
+      memberId: session.id,
+      familyId,
+    })
 
     return NextResponse.json({ success: true, newAmount: amount })
   } catch (error) {

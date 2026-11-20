@@ -106,18 +106,25 @@ export async function POST(request) {
 
     const CATEGORY_LABELS = {
       sembako: '🛒 Sembako & Kebutuhan Dapur',
-      makan: '🍽️ Makanan & Minuman',
-      tagihan: '💡 Tagihan & Utilitas',
-      transportasi: '🚗 Transportasi & BBM',
-      kesehatan: '💊 Kesehatan & Obat',
-      pendidikan: '📚 Pendidikan',
-      hiburan: '🎬 Hiburan & Rekreasi',
-      pakaian: '👕 Pakaian & Belanja Diri',
-      rumah_tangga: '🏠 Perlengkapan Rumah',
-      sosial: '🤝 Sosial & Amal',
-      tabungan: '💰 Tabungan & Investasi',
-      lainnya: '📦 Lain-lain',
-      pemasukan: '💵 Pemasukan'
+      kesehatan: '🏥 Kesehatan & Obat',
+      tagihan: '🔌 Tagihan & Utilitas',
+      makan: '🍔 Makan & Jajan',
+      pakaian: '👕 Pakaian & Perlengkapan',
+      rumah: '🔧 Perbaikan Rumah',
+      lainnya: '📦 Lainnya',
+      pemasukan: '💰 Uang Masuk / Top-up'
+    }
+
+    const CATEGORY_ALIAS_MAP = {
+      sembako: 'sembako',
+      kesehatan: 'kesehatan',
+      tagihan: 'tagihan',
+      makan: 'makan',
+      pakaian: 'pakaian',
+      rumah: 'rumah',
+      rumah_tangga: 'rumah',
+      lainnya: 'lainnya',
+      pemasukan: 'pemasukan',
     }
 
     const MONTH_NAMES = [
@@ -181,14 +188,14 @@ export async function POST(request) {
       .join('\n')
 
     const todayStr = new Date().toLocaleDateString('id-ID', {
-      timeZone: 'Asia/Jakarta',
+      timeZone: 'Asia/Makassar',
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     })
 
-    const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }) // YYYY-MM-DD
+    const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Makassar' }) // YYYY-MM-DD
 
     // 6. Susun System Prompt AI
     const systemPrompt = `Anda adalah "Asisten AI Keuangan", asisten keuangan pribadi yang hangat, ramah, cerdas, dan komunikatif untuk keluarga "${familyName}".
@@ -231,7 +238,7 @@ ${txStr || 'Belum ada transaksi tercatat.'}
    - Konfirmasi dengan ramah bahwa transaksi sudah dicatat beserta rincian singkatnya.
    - WAJIB tambahkan tag tersembunyi ini di baris paling bawah jawaban Anda (sistem akan otomatis menyimpannya ke database dan menyembunyikan tag ini dari layar pengguna):
      [[ADD_TX:YYYY-MM-DD|kode_kategori|Nama Barang|NominalAngkaMurni|CatatanOpsional]]
-     Pilihan kode_kategori valid: sembako, makan, tagihan, transportasi, kesehatan, pendidikan, hiburan, pakaian, rumah_tangga, sosial, tabungan, lainnya, pemasukan.
+     Pilihan kode_kategori valid: sembako, kesehatan, tagihan, makan, pakaian, rumah, lainnya.
      Contoh: [[ADD_TX:${todayIso}|sembako|Beras 5kg|75000|]]
 6. Balas menggunakan bahasa yang sama dengan pertanyaan pengguna (Indonesia / Inggris / Belanda).`
 
@@ -306,31 +313,39 @@ ${txStr || 'Belum ada transaksi tercatat.'}
             const parts = match[1].split('|').map(s => s.trim())
             const [rawDate, rawCat, rawItem, rawAmt, rawNotes] = parts
             const cleanAmt = parseInt(String(rawAmt || '').replace(/[^\d]/g, ''), 10)
-            const validCat = CATEGORY_LABELS[rawCat] ? rawCat : 'lainnya'
+            const validCat = CATEGORY_ALIAS_MAP[rawCat] || 'lainnya'
             const validDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : todayIso
 
-            if (rawItem && cleanAmt > 0) {
-              const newTx = await prisma.transaction.create({
-                data: {
-                  familyId,
-                  itemName: rawItem,
-                  amount: BigInt(cleanAmt),
-                  category: validCat,
-                  transactionDate: new Date(validDate),
-                  notes: rawNotes || 'Dicatat via Asisten AI',
-                  memberId: session.id,
-                }
-              })
-              const adjustedMonths = await syncBudgetsForTransactionChange(null, newTx)
+            if (rawItem && Number.isSafeInteger(cleanAmt) && cleanAmt > 0) {
               const txDateObj = new Date(validDate)
+              const { newTx, adjustedMonths } = await prisma.$transaction(async (tx) => {
+                const created = await tx.transaction.create({
+                  data: {
+                    familyId,
+                    itemName: rawItem,
+                    amount: BigInt(cleanAmt),
+                    category: validCat,
+                    transactionDate: txDateObj,
+                    notes: rawNotes || 'Dicatat via Asisten AI',
+                    memberId: session.id,
+                  }
+                })
+                const adjusted = await syncBudgetsForTransactionChange(null, created, { db: tx })
+                return { newTx: created, adjustedMonths: adjusted }
+              })
+
               const remainingBalance = await getMonthRemainingBalance(
                 txDateObj.getUTCMonth() + 1,
                 txDateObj.getUTCFullYear(),
                 familyId
               )
+              const balanceText =
+                (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
+                (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
+
               await logActivity({
                 action: 'TRANSACTION_CREATE',
-                description: `${session.name} mencatat transaksi "${rawItem}" sebesar ${formatRupiah(cleanAmt)} via Asisten AI`,
+                description: `${session.name} mencatat transaksi "${rawItem}" sebesar ${formatRupiah(cleanAmt)} via Asisten AI${balanceText}`,
                 details: {
                   id: newTx.id,
                   itemName: rawItem,

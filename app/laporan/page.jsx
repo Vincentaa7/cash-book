@@ -16,10 +16,10 @@ export default function LaporanPage() {
   const { t, language } = useLanguage()
   const { familyName } = useUser()
 
-  // Helper untuk zona waktu Asia/Jakarta yang aman dari hydration mismatch & shift
+  // Helper untuk zona waktu WITA (Asia/Makassar) yang konsisten dengan backend lib/cashbook.js
   const getJakartaDateParts = (date = new Date()) => {
     const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Jakarta',
+      timeZone: 'Asia/Makassar',
       year: 'numeric',
       month: 'numeric',
       day: 'numeric',
@@ -578,6 +578,7 @@ export default function LaporanPage() {
                 >
                   <option value="">{t('all_categories')}</option>
                   {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.emoji} {t(c.labelKey)}</option>)}
+                  <option value="pemasukan">💰 {t('cat_pemasukan')}</option>
                 </select>
               </div>
             </div>

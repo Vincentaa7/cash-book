@@ -136,10 +136,12 @@ export async function POST(request) {
 
     const snapshots = Object.values(snapshotMap)
 
-    // 3. Upsert ke monthly_snapshots (tambahkan jika sudah ada)
-    await Promise.all(
-      snapshots.map(snap =>
-        prisma.monthlySnapshot.upsert({
+    // 3 & 4. Upsert ke monthly_snapshots dan hapus transaksi satuan secara ATOMIK
+    // agar tidak pernah terjadi transaksi terhapus tanpa arsip atau arsip ganda
+    const idsToDelete = oldTransactions.map(tx => tx.id)
+    const deleteResult = await prisma.$transaction(async (tx) => {
+      for (const snap of snapshots) {
+        await tx.monthlySnapshot.upsert({
           where: {
             uq_snapshot: {
               familyId,
@@ -149,7 +151,6 @@ export async function POST(request) {
             },
           },
           update: {
-            // Tambahkan ke yang sudah ada (jika cleanup dijalankan berkali-kali)
             totalAmount: { increment: snap.totalAmount },
             txCount: { increment: snap.txCount },
           },
@@ -162,13 +163,11 @@ export async function POST(request) {
             txCount: snap.txCount,
           },
         })
-      )
-    )
+      }
 
-    // 4. Hapus transaksi satuan yang sudah diarsipkan
-    const idsToDelete = oldTransactions.map(tx => tx.id)
-    const deleteResult = await prisma.transaction.deleteMany({
-      where: { id: { in: idsToDelete }, familyId },
+      return tx.transaction.deleteMany({
+        where: { id: { in: idsToDelete }, familyId },
+      })
     })
 
     // Hitung bulan unik yang terdampak

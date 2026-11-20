@@ -53,15 +53,20 @@ export async function POST(request) {
     }
 
     const { month, year, amount, action = 'set', notes } = await request.json()
-    const parsedMonth  = parseInt(month)
-    const parsedYear   = parseInt(year)
-    const parsedAmount = BigInt(amount)
+    const parsedMonth  = parseInt(month, 10)
+    const parsedYear   = parseInt(year, 10)
+    const numericAmount = Number(amount)
 
-    if (!month || !year || !amount || amount <= 0) {
-      return NextResponse.json({ error: 'Data saldo tidak valid' }, { status: 400 })
+    if (
+      !Number.isInteger(parsedMonth) || parsedMonth < 1 || parsedMonth > 12 ||
+      !Number.isInteger(parsedYear) || parsedYear < 2020 || parsedYear > 2100 ||
+      !Number.isSafeInteger(numericAmount) || numericAmount <= 0
+    ) {
+      return NextResponse.json({ error: 'Data saldo tidak valid (nominal harus bilangan bulat > 0)' }, { status: 400 })
     }
 
-    let resultAmount = Number(parsedAmount)
+    const parsedAmount = BigInt(numericAmount)
+    let resultAmount = numericAmount
 
     if (action === 'add') {
       const now = new Date()
@@ -70,9 +75,9 @@ export async function POST(request) {
         txDate = new Date(Date.UTC(parsedYear, parsedMonth - 1, 1))
       }
 
-      // Top-up: Jalankan upsert saldo utama & pencatatan transaksi masuk secara paralel (1 round-trip!)
+      // Top-up: Eksekusi upsert saldo utama & pencatatan transaksi masuk secara atomik
       if (prisma.personalBudget && prisma.personalTransaction) {
-        const [upsertedBudget] = await Promise.all([
+        const [upsertedBudget] = await prisma.$transaction([
           prisma.personalBudget.upsert({
             where: {
               uq_personal_budget: {

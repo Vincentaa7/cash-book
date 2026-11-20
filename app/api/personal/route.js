@@ -149,20 +149,27 @@ export async function POST(request) {
     }
 
     const { itemName, amount, type, category, date, notes } = await request.json()
+    const cleanItemName = typeof itemName === 'string' ? itemName.trim() : ''
+    const numericAmount = Number(amount)
+    const txDate = new Date(date)
 
-    if (!itemName || !amount || !category || !date) {
-      return NextResponse.json({ error: 'Field wajib tidak lengkap' }, { status: 400 })
+    if (!cleanItemName || !category || !date || Number.isNaN(txDate.getTime())) {
+      return NextResponse.json({ error: 'Field wajib tidak lengkap atau tanggal tidak valid' }, { status: 400 })
+    }
+
+    if (!Number.isSafeInteger(numericAmount) || numericAmount <= 0) {
+      return NextResponse.json({ error: 'Nominal harus berupa bilangan bulat lebih dari 0' }, { status: 400 })
     }
 
     const item = await prisma.personalTransaction.create({
       data: {
         memberId: session.id,
-        itemName: itemName.trim(),
-        amount:   BigInt(amount),
-        type:     type || 'expense',
+        itemName: cleanItemName,
+        amount:   BigInt(numericAmount),
+        type:     type === 'income' ? 'income' : 'expense',
         category: category,
-        date:     new Date(date),
-        notes:    notes?.trim() || null,
+        date:     txDate,
+        notes:    typeof notes === 'string' && notes.trim() ? notes.trim() : null,
       },
     })
 

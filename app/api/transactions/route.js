@@ -157,73 +157,63 @@ export async function POST(request) {
 
     const familyId = session.familyId || '1'
     const { itemName, amount, category, transactionDate, notes } = await request.json()
-
-    if (!itemName || !amount || !category || !transactionDate) {
-      return NextResponse.json({ error: 'Data transaksi tidak lengkap' }, { status: 400 })
-    }
-
-    if (amount <= 0) {
-      return NextResponse.json({ error: 'Jumlah harus lebih dari 0' }, { status: 400 })
-    }
-
+    const cleanItemName = typeof itemName === 'string' ? itemName.trim() : ''
     const numericAmount = Number(amount)
     const txDate = new Date(transactionDate)
 
-    // Jalankan insert transaksi & sinkronisasi kas bulan secara paralel (1 round-trip utama!)
-    const [transaction, adjustedMonths] = await Promise.all([
-      prisma.transaction.create({
+    if (!cleanItemName || !category || !transactionDate || Number.isNaN(txDate.getTime())) {
+      return NextResponse.json({ error: 'Data transaksi tidak lengkap atau tanggal tidak valid' }, { status: 400 })
+    }
+
+    if (!Number.isSafeInteger(numericAmount) || numericAmount <= 0) {
+      return NextResponse.json({ error: 'Jumlah harus berupa bilangan bulat lebih dari 0' }, { status: 400 })
+    }
+
+    // Eksekusi insert transaksi & sinkronisasi kas bulan secara atomik dalam 1 DB transaction
+    const { transaction, adjustedMonths } = await prisma.$transaction(async (tx) => {
+      const created = await tx.transaction.create({
         data: {
           familyId,
-          itemName,
+          itemName: cleanItemName,
           amount: BigInt(numericAmount),
           category,
           transactionDate: txDate,
-          notes: notes || null,
+          notes: typeof notes === 'string' && notes.trim() ? notes.trim() : null,
           memberId: session.id,
         },
         include: {
           member: { select: { id: true, name: true, avatarColor: true } },
         },
-      }),
-      syncBudgetsForTransactionChange(null, {
-        familyId,
-        amount: numericAmount,
-        category,
-        transactionDate: txDate,
-      }),
-    ])
+      })
 
-    // Jalankan kalkulasi sisa saldo & pencatatan audit log secara non-blocking di background
-    // agar respons simpan ke pengguna kembali secara instan (Near-Zero-Latency CRUD)
+      const adjusted = await syncBudgetsForTransactionChange(null, created, { db: tx })
+      return { transaction: created, adjustedMonths: adjusted }
+    })
+
+    // WAJIB di-await sebelum return agar tidak terpotong oleh Vercel Serverless freeze
     const txMonth = txDate.getUTCMonth() + 1
     const txYear = txDate.getUTCFullYear()
-    void (async () => {
-      try {
-        const remainingBalance = await getMonthRemainingBalance(txMonth, txYear, familyId)
-        const balanceText =
-          (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
-          (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
+    const remainingBalance = await getMonthRemainingBalance(txMonth, txYear, familyId)
+    const balanceText =
+      (remainingBalance !== null ? ` • Sisa Saldo: ${formatRupiah(remainingBalance)}` : '') +
+      (adjustedMonths.length ? ` • Kas disesuaikan: ${adjustedMonths.join(', ')}` : '')
 
-        await logActivity({
-          action: 'TRANSACTION_CREATE',
-          description: `${session.name} mencatat transaksi "${itemName}" sebesar ${formatRupiah(numericAmount)}${balanceText}`,
-          details: {
-            id: transaction.id,
-            itemName,
-            amount: numericAmount,
-            category,
-            transactionDate,
-            notes,
-            remainingBalance,
-            adjustedMonths,
-          },
-          memberId: session.id,
-          familyId,
-        })
-      } catch (err) {
-        console.error('Background logActivity error:', err)
-      }
-    })()
+    await logActivity({
+      action: 'TRANSACTION_CREATE',
+      description: `${session.name} mencatat transaksi "${cleanItemName}" sebesar ${formatRupiah(numericAmount)}${balanceText}`,
+      details: {
+        id: transaction.id,
+        itemName: cleanItemName,
+        amount: numericAmount,
+        category,
+        transactionDate,
+        notes: transaction.notes,
+        remainingBalance,
+        adjustedMonths,
+      },
+      memberId: session.id,
+      familyId,
+    })
 
     return NextResponse.json({
       transaction: { ...transaction, amount: Number(transaction.amount) },

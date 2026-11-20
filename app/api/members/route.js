@@ -94,8 +94,8 @@ export async function POST(request) {
       select: { id: true, familyId: true, name: true, role: true, avatarColor: true, isActive: true },
     })
 
-    // Catat log aktivitas tambah anggota di background
-    void logActivity({
+    // WAJIB di-await sebelum return agar audit log 100% tersimpan di Vercel Serverless
+    await logActivity({
       familyId,
       action: 'MEMBER_CREATE',
       description: `${session.name} menambah anggota keluarga baru bernama "${cleanName}" dengan role "${member.role}"`,

@@ -155,12 +155,17 @@ export default function TransaksiPage() {
   }
 
   async function handleEditSave() {
+    const parsedAmt = parseInt(editForm.amount, 10)
+    if (!editForm.itemName?.trim() || !Number.isSafeInteger(parsedAmt) || parsedAmt <= 0 || !editForm.transactionDate) {
+      alert('Pastikan nama item, tanggal, dan nominal (> 0) terisi dengan benar.')
+      return
+    }
     setEditLoading(true)
     try {
       const res = await fetch(`/api/transactions/${editTx.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...editForm, amount: parseInt(editForm.amount) }),
+        body: JSON.stringify({ ...editForm, amount: parsedAmt }),
       })
       if (res.ok) {
         const { transaction: updatedTx } = await res.json()
@@ -169,6 +174,9 @@ export default function TransaksiPage() {
         setTransactions(prev => prev.map(item => item.id === updatedTx.id ? updatedTx : item))
         invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
         fetchTransactions(true)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'Gagal menyimpan perubahan transaksi.')
       }
     } catch {}
     setEditLoading(false)
@@ -240,6 +248,7 @@ export default function TransaksiPage() {
                 {CATEGORIES.map(c => (
                   <option key={c.id} value={c.id}>{c.emoji} {t(c.labelKey)}</option>
                 ))}
+                <option value="pemasukan">💰 {t('cat_pemasukan')}</option>
               </select>
               <select
                 className="form-select"
@@ -506,15 +515,21 @@ export default function TransaksiPage() {
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">{t('category')}</label>
-                <select
-                  className="form-select"
-                  value={editForm.category}
-                  onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
-                >
-                  {CATEGORIES.map(c => (
-                    <option key={c.id} value={c.id}>{c.emoji} {t(c.labelKey)}</option>
-                  ))}
-                </select>
+                {editTx.category === 'pemasukan' ? (
+                  <select className="form-select" value="pemasukan" disabled style={{ opacity: 0.75, cursor: 'not-allowed' }}>
+                    <option value="pemasukan">💰 {t('cat_pemasukan')}</option>
+                  </select>
+                ) : (
+                  <select
+                    className="form-select"
+                    value={editForm.category}
+                    onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                  >
+                    {CATEGORIES.map(c => (
+                      <option key={c.id} value={c.id}>{c.emoji} {t(c.labelKey)}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">{t('date')}</label>
