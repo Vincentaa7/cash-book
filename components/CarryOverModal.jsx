@@ -69,7 +69,7 @@ export default function CarryOverModal({ amount, prevMonth, prevYear, onComplete
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
             <div style={{ 
-              width: 44, height: 44, 
+              width: 44, height: 44, minWidth: 44, flexShrink: 0,
               borderRadius: 12, 
               background: 'linear-gradient(135deg, #10b981, #3b82f6)', 
               display: 'flex', alignItems: 'center', justifyContent: 'center', 
@@ -97,7 +97,7 @@ export default function CarryOverModal({ amount, prevMonth, prevYear, onComplete
               border: '1px solid #e2e8f0'
             }}>
               <div style={{ 
-                width: 42, height: 42, borderRadius: 10, background: 'white', 
+                width: 42, height: 42, minWidth: 42, flexShrink: 0, borderRadius: 10, background: 'white', 
                 display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0'
               }}>
                 <Wallet size={22} color="#10b981" />

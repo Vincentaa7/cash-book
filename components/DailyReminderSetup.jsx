@@ -163,27 +163,30 @@ export default function DailyReminderSetup({ familyName = 'Cash Book' }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '16px 20px',
+        gap: 12,
+        padding: '16px 18px',
         borderRadius: 12,
-        border: `2px solid ${enabled ? 'var(--color-primary-600)' : 'var(--border-color)'}`,
+        border: `1.5px solid ${enabled ? 'var(--color-primary-600)' : 'var(--border-color)'}`,
         background: enabled
           ? 'var(--color-primary-hover, rgba(13,148,136,0.08))'
           : 'var(--bg-secondary)',
         transition: 'all 0.2s ease',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: 1 }}>
           <div style={{
-            width: 44, height: 44, borderRadius: '50%',
+            width: 44, height: 44, minWidth: 44, minHeight: 44,
+            borderRadius: '50%',
+            flexShrink: 0,
             background: enabled ? 'var(--color-primary-600)' : 'var(--bg-tertiary)',
             border: enabled ? 'none' : '1px solid var(--border-color)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: enabled ? 'white' : 'var(--text-muted)', transition: 'all 0.2s',
           }}>
-            {enabled ? <Bell size={20} /> : <BellOff size={20} />}
+            {enabled ? <Bell size={20} strokeWidth={1.9} style={{ flexShrink: 0 }} /> : <BellOff size={20} strokeWidth={1.9} style={{ flexShrink: 0 }} />}
           </div>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{t('reminder_enable')}</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: '0.95rem', lineHeight: 1.3 }}>{t('reminder_enable')}</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.45 }}>
               {t('reminder_subtitle')}
             </div>
           </div>
@@ -191,22 +194,28 @@ export default function DailyReminderSetup({ familyName = 'Cash Book' }) {
 
         {/* Toggle Switch */}
         <button
+          type="button"
           onClick={handleToggle}
+          aria-pressed={enabled}
+          aria-label={t('reminder_enable')}
           style={{
             position: 'relative',
-            width: 52, height: 28,
-            borderRadius: 14,
+            width: 50, height: 28,
+            borderRadius: 99,
             background: enabled ? 'var(--color-primary-600)' : 'var(--bg-tertiary)',
             border: `1px solid ${enabled ? 'var(--color-primary-600)' : 'var(--border-color)'}`,
             cursor: 'pointer',
             transition: 'all 0.2s',
             flexShrink: 0,
+            padding: 0,
           }}
         >
           <span style={{
             position: 'absolute',
-            top: 3, left: enabled ? 26 : 3,
-            width: 22, height: 22,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            left: enabled ? 24 : 3,
+            width: 21, height: 21,
             borderRadius: '50%', background: 'white',
             transition: 'left 0.2s ease',
             boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
