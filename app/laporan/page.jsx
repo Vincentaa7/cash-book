@@ -6,15 +6,22 @@ import AppShell from '@/components/AppShell'
 import { useLanguage } from '@/components/LanguageContext'
 import { useUser } from '@/components/UserContext'
 import CategoryBadge from '@/components/CategoryBadge'
-import { formatRupiah, formatDate, formatMonthYear, calcPercentage, formatNumber } from '@/lib/format'
+import CategoryIcon from '@/components/CategoryIcon'
+import { LaporanSkeleton } from '@/components/Skeleton'
+import { useToast } from '@/components/ToastContext'
+import { formatRupiah, formatDate, formatMonthYear, calcPercentage, formatNumber, formatMemberName } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo } from '@/lib/constants'
 import { cachedFetch, peekCache } from '@/lib/clientCache'
-import { Download, FileText, Filter, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import {
+  Download, FileText, Filter, TrendingUp, TrendingDown, Minus, Printer,
+  BarChart3, ReceiptText, ArrowUpRight, Calculator, CalendarDays, Tag, User, PieChart as PieChartIcon, Inbox
+} from 'lucide-react'
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 export default function LaporanPage() {
   const { t, language } = useLanguage()
   const { familyName } = useUser()
+  const { toast } = useToast()
 
   // Helper untuk zona waktu WITA (Asia/Makassar) yang konsisten dengan backend lib/cashbook.js
   const getJakartaDateParts = (date = new Date()) => {
@@ -305,9 +312,10 @@ export default function LaporanPage() {
       // Simpan PDF
       const fileName = `laporan-keuangan-${startDate}-${endDate}.pdf`
       doc.save(fileName)
+      toast.success('Laporan PDF berhasil dibuat & diunduh')
     } catch (err) {
       console.error('PDF export error:', err)
-      alert('Gagal membuat PDF. Silakan coba lagi.')
+      toast.error('Gagal membuat PDF. Silakan coba lagi.')
     }
   }
 
@@ -515,20 +523,20 @@ export default function LaporanPage() {
           </div>
         </div>
 
-        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div className="page-header">
           <div>
-            <h1>{t('reports')} 📄</h1>
-            <p>{t('digital_cashbook')}</p>
+            <h1>{t('reports')}</h1>
+            <p>Analisis realisasi anggaran, tren bulanan, dan ekspor laporan keuangan</p>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="page-header-actions">
             <button className="btn btn-ghost btn-sm" onClick={handleExport}>
-              <Download size={15} /> {t('actions')} CSV
+              <Download size={15} strokeWidth={1.85} /> Export CSV
             </button>
-            <button className="btn btn-secondary btn-sm" onClick={handleExportPDF} style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', border: 'none' }}>
-              <FileText size={15} /> Export PDF
+            <button className="btn btn-danger btn-sm" onClick={handleExportPDF}>
+              <FileText size={15} strokeWidth={1.85} /> Export PDF
             </button>
             <button className="btn btn-ghost btn-sm" onClick={handlePrint}>
-              <FileText size={15} /> {t('print_report')}
+              <Printer size={15} strokeWidth={1.85} /> {t('print_report')}
             </button>
           </div>
         </div>
@@ -566,7 +574,7 @@ export default function LaporanPage() {
                   onChange={e => setMemberId(e.target.value)}
                 >
                   <option value="">{t('all_members')}</option>
-                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  {members.map(m => <option key={m.id} value={m.id}>{formatMemberName(m.name)}</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ margin: 0, flex: 1 }}>
@@ -577,8 +585,8 @@ export default function LaporanPage() {
                   onChange={e => setCategory(e.target.value)}
                 >
                   <option value="">{t('all_categories')}</option>
-                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.emoji} {t(c.labelKey)}</option>)}
-                  <option value="pemasukan">💰 {t('cat_pemasukan')}</option>
+                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{t(c.labelKey)}</option>)}
+                  <option value="pemasukan">{t('cat_pemasukan')}</option>
                 </select>
               </div>
             </div>
@@ -605,26 +613,27 @@ export default function LaporanPage() {
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <h3 className="card-title">
-                📊 {t('budget_vs_realization')} ({formatMonthYear(selectedMonth, selectedYear, language)}{!isSameMonth ? ` • Bulan Berjalan` : ''})
+                <BarChart3 size={16} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
+                {t('budget_vs_realization')} ({formatMonthYear(selectedMonth, selectedYear, language)}{!isSameMonth ? ' · Bulan Berjalan' : ''})
               </h3>
             </div>
             <div className="card-body">
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '0.9rem', flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: '0.88rem', flexWrap: 'wrap', gap: 12 }}>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)' }}>
-                    {isSameMonth ? t('total_budget') : `Total Kas (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    {isSameMonth ? `${t('total_budget')}:` : `Total Kas (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
                   </span>{' '}
-                  <strong style={{ fontSize: '1.05rem' }}>{formatRupiah(dashboardSummary.totalBudget)}</strong>
+                  <strong className="tabular-nums" style={{ fontSize: '1.02rem' }}>{formatRupiah(dashboardSummary.totalBudget)}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)' }}>
-                    {isSameMonth ? t('total_expense') : `Pengeluaran (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    {isSameMonth ? `${t('total_expense')}:` : `Pengeluaran (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
                   </span>{' '}
-                  <strong style={{ fontSize: '1.05rem', color: '#ef4444' }}>{formatRupiah(dashboardSummary.totalExpense)}</strong>
+                  <strong className="tabular-nums" style={{ fontSize: '1.02rem', color: 'var(--color-danger)' }}>{formatRupiah(dashboardSummary.totalExpense)}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)' }}>{t('balance')}:</span>{' '}
-                  <strong style={{ fontSize: '1.05rem', color: dashboardSummary.remaining >= 0 ? '#10b981' : '#ef4444' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>{t('balance')}:</span>{' '}
+                  <strong className="tabular-nums" style={{ fontSize: '1.02rem', color: dashboardSummary.remaining >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
                     {formatRupiah(dashboardSummary.remaining)}
                   </strong>
                 </div>
@@ -636,15 +645,15 @@ export default function LaporanPage() {
                 const barColor = pct <= 75 ? '#10b981' : pct <= 95 ? '#f59e0b' : '#ef4444'
                 return (
                   <div>
-                    <div className="progress-bar" style={{ height: 10 }}>
+                    <div className="progress-bar" style={{ height: 8 }}>
                       <div
                         className="progress-fill"
                         style={{ width: `${Math.min(100, pct)}%`, background: barColor, height: '100%', borderRadius: 99 }}
                       />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    <div className="tabular-nums" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                       <span>{pct}% Terpakai</span>
-                      <span>{pct > 100 ? 'Overbudget!' : `${100 - pct}% Tersisa`}</span>
+                      <span>{pct > 100 ? 'Melebihi Anggaran' : `${100 - pct}% Tersisa`}</span>
                     </div>
                   </div>
                 )
@@ -654,57 +663,69 @@ export default function LaporanPage() {
         )}
 
         {loading ? (
-          <div className="loading-container"><div className="spinner" /><p>{t('loading')}</p></div>
+          <LaporanSkeleton />
         ) : (
           <>
-            {/* Summary */}
-            <div className="summary-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            {/* Symmetrical 3x2 Clean Fintech KPI Grid (Zero Truncation, Zero Orphan Card) */}
+            <div className="summary-grid summary-grid-3" style={{ marginBottom: 24 }}>
               {/* Card 1: Total Transaksi */}
               <div className="summary-card card-history">
-                <div className="summary-card-icon">📊</div>
-                <div className="summary-card-label">{t('history')}</div>
+                <div className="summary-card-head">
+                  <span className="summary-card-label">Jumlah Transaksi</span>
+                  <div className="summary-card-icon"><ReceiptText size={16} strokeWidth={1.85} /></div>
+                </div>
                 <div className="summary-card-value">{data?.total !== undefined ? data.total : transactions.length}</div>
-                <div className="summary-card-sub">{startDate} s/d {endDate}</div>
+                <div className="summary-card-sub tabular-nums">{startDate} s/d {endDate}</div>
               </div>
 
               {/* Card 2: Total Pengeluaran */}
               <div className="summary-card card-expense">
-                <div className="summary-card-icon">💸</div>
-                <div className="summary-card-label">{t('total_expense')}</div>
-                <div className="summary-card-value">{formatRupiah(totalExpense)}</div>
-                <div className="summary-card-sub">{t('digital_cashbook')}</div>
+                <div className="summary-card-head">
+                  <span className="summary-card-label">{t('total_expense')}</span>
+                  <div className="summary-card-icon"><ArrowUpRight size={16} strokeWidth={1.85} /></div>
+                </div>
+                <div className="summary-card-value" style={{ color: 'var(--color-danger)' }}>{formatRupiah(totalExpense)}</div>
+                <div className="summary-card-sub">Periode filter aktif</div>
               </div>
 
               {/* Card 3: Rata-rata per Transaksi */}
               <div className="summary-card card-avg-tx">
-                <div className="summary-card-icon">🧮</div>
-                <div className="summary-card-label">{t('avg_transaction')}</div>
+                <div className="summary-card-head">
+                  <span className="summary-card-label">{t('avg_transaction')}</span>
+                  <div className="summary-card-icon"><Calculator size={16} strokeWidth={1.85} /></div>
+                </div>
                 <div className="summary-card-value">{formatRupiah(avgTxAmount)}</div>
                 <div className="summary-card-sub">Per transaksi dicatat</div>
               </div>
 
               {/* Card 4: Hari Terboros */}
               <div className="summary-card card-peak-day">
-                <div className="summary-card-icon">📅</div>
-                <div className="summary-card-label">{t('most_expensive_day')}</div>
-                <div className="summary-card-value" style={{ fontSize: '1.45rem' }}>{peakDayName}</div>
-                <div className="summary-card-sub">{maxDayExpense > 0 ? `Total: ${formatRupiah(maxDayExpense)}` : 'Belum ada data'}</div>
+                <div className="summary-card-head">
+                  <span className="summary-card-label">{t('most_expensive_day')}</span>
+                  <div className="summary-card-icon"><CalendarDays size={16} strokeWidth={1.85} /></div>
+                </div>
+                <div className="summary-card-value">{peakDayName}</div>
+                <div className="summary-card-sub tabular-nums">{maxDayExpense > 0 ? `Total: ${formatRupiah(maxDayExpense)}` : 'Belum ada data'}</div>
               </div>
 
               {/* Card 5: Kategori Terboros */}
               {catBreakdown[0] ? (
                 <div className="summary-card card-peak-cat">
-                  <div className="summary-card-icon">🏆</div>
-                  <div className="summary-card-label">{t('highest_expense')} ({t('category').split(' ')[0]})</div>
-                  <div className="summary-card-value" style={{ fontSize: '1.15rem' }}>
-                    {getCategoryInfo(catBreakdown[0].category).emoji} {t(getCategoryInfo(catBreakdown[0].category).labelKey)}
+                  <div className="summary-card-head">
+                    <span className="summary-card-label">{t('highest_expense')} ({t('category')})</span>
+                    <div className="summary-card-icon"><Tag size={16} strokeWidth={1.85} /></div>
                   </div>
-                  <div className="summary-card-sub">{formatRupiah(catBreakdown[0].amount)}</div>
+                  <div className="summary-card-value" style={{ fontSize: '1.15rem' }}>
+                    {t(getCategoryInfo(catBreakdown[0].category).labelKey)}
+                  </div>
+                  <div className="summary-card-sub tabular-nums">{formatRupiah(catBreakdown[0].amount)}</div>
                 </div>
               ) : (
                 <div className="summary-card card-peak-cat">
-                  <div className="summary-card-icon">🏆</div>
-                  <div className="summary-card-label">{t('highest_expense')}</div>
+                  <div className="summary-card-head">
+                    <span className="summary-card-label">{t('highest_expense')} ({t('category')})</span>
+                    <div className="summary-card-icon"><Tag size={16} strokeWidth={1.85} /></div>
+                  </div>
                   <div className="summary-card-value">-</div>
                   <div className="summary-card-sub">Belum ada data</div>
                 </div>
@@ -713,15 +734,19 @@ export default function LaporanPage() {
               {/* Card 6: Anggota Terboros */}
               {memberBreakdown[0] ? (
                 <div className="summary-card card-peak-member">
-                  <div className="summary-card-icon">👤</div>
-                  <div className="summary-card-label">{t('highest_expense')} ({t('member_name').split(' ')[0]})</div>
-                  <div className="summary-card-value" style={{ fontSize: '1.3rem' }} title={memberBreakdown[0].name}>{memberBreakdown[0].name}</div>
-                  <div className="summary-card-sub">{formatRupiah(memberBreakdown[0].amount)}</div>
+                  <div className="summary-card-head">
+                    <span className="summary-card-label">{t('highest_expense')} (Anggota)</span>
+                    <div className="summary-card-icon"><User size={16} strokeWidth={1.85} /></div>
+                  </div>
+                  <div className="summary-card-value truncate" style={{ fontSize: '1.1rem' }} title={memberBreakdown[0].name}>{formatMemberName(memberBreakdown[0].name)}</div>
+                  <div className="summary-card-sub tabular-nums">{formatRupiah(memberBreakdown[0].amount)}</div>
                 </div>
               ) : (
                 <div className="summary-card card-peak-member">
-                  <div className="summary-card-icon">👤</div>
-                  <div className="summary-card-label">{t('highest_expense')}</div>
+                  <div className="summary-card-head">
+                    <span className="summary-card-label">{t('highest_expense')} (Anggota)</span>
+                    <div className="summary-card-icon"><User size={16} strokeWidth={1.85} /></div>
+                  </div>
                   <div className="summary-card-value">-</div>
                   <div className="summary-card-sub">Belum ada data</div>
                 </div>
@@ -732,26 +757,32 @@ export default function LaporanPage() {
               {/* Breakdown Kategori */}
               <div className="card">
                 <div className="card-header">
-                  <h3 className="card-title">{t('category')} Breakdown</h3>
+                  <h3 className="card-title">
+                    <Tag size={15} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
+                    Rincian {t('category')}
+                  </h3>
                 </div>
                 <div className="card-body">
                   {catBreakdown.length === 0 ? (
                     <div className="empty-state" style={{ padding: 32 }}>
-                      <div className="empty-state-icon">🥧</div>
+                      <div className="empty-state-icon"><PieChartIcon size={22} /></div>
                       <p>{t('no_transactions')}</p>
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gap: 10 }}>
+                    <div style={{ display: 'grid', gap: 12 }}>
                       {catBreakdown.map(({ category: cat, amount }) => {
                         const info = getCategoryInfo(cat)
                         const pct = calcPercentage(amount, totalExpense)
                         return (
                           <div key={cat}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.875rem' }}>
-                              <span>{info.emoji} {t(info.labelKey)}</span>
-                              <span style={{ fontWeight: 600 }}>{formatRupiah(amount)} ({pct}%)</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, fontSize: '0.84rem' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: 'var(--text-primary)', fontWeight: 500 }}>
+                                <CategoryIcon category={info.id} size={14} style={{ color: info.color }} />
+                                {t(info.labelKey)}
+                              </span>
+                              <span className="tabular-nums" style={{ fontWeight: 650 }}>{formatRupiah(amount)} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({pct}%)</span></span>
                             </div>
-                            <div className="progress-bar">
+                            <div className="progress-bar" style={{ marginTop: 0 }}>
                               <div
                                 className="progress-fill"
                                 style={{ width: `${pct}%`, background: info.color }}
@@ -768,7 +799,10 @@ export default function LaporanPage() {
               {/* Donut Chart */}
               <div className="card">
                 <div className="card-header">
-                  <h3 className="card-title">{t('category')} Statistics</h3>
+                  <h3 className="card-title">
+                    <PieChartIcon size={15} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
+                    Statistik {t('category')}
+                  </h3>
                 </div>
                 <div className="card-body">
                   {catBreakdown.length > 0 ? (
@@ -783,6 +817,7 @@ export default function LaporanPage() {
                           innerRadius={60}
                           outerRadius={95}
                           paddingAngle={2}
+                          stroke="none"
                         >
                           {catBreakdown.map((entry, i) => {
                             const info = getCategoryInfo(entry.category)
@@ -790,18 +825,18 @@ export default function LaporanPage() {
                           })}
                         </Pie>
                         <Tooltip formatter={v => formatRupiah(v)} />
-                        <Legend wrapperStyle={{ fontSize: 11 }}
+                        <Legend wrapperStyle={{ fontSize: 11.5 }}
                           formatter={v => {
                             const info = getCategoryInfo(v)
                             const label = t(info.labelKey)
-                            return `${info.emoji} ${label.length > 20 ? label.slice(0, 20) + '…' : label}`
+                            return label.length > 20 ? label.slice(0, 20) + '…' : label
                           }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="empty-state" style={{ padding: 32 }}>
-                      <div className="empty-state-icon">📊</div>
+                      <div className="empty-state-icon"><BarChart3 size={22} /></div>
                       <p>{t('no_transactions')}</p>
                     </div>
                   )}
@@ -813,7 +848,10 @@ export default function LaporanPage() {
             {compareData && (compareData.history || compareData.months6) && (
               <div className="card" style={{ marginTop: 24 }}>
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: 8 }}>
-                  <h3 className="card-title">📊 Tren 6 Bulan Terakhir</h3>
+                  <h3 className="card-title">
+                    <BarChart3 size={16} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
+                    Tren 6 Bulan Terakhir
+                  </h3>
                   {/* Summary naik/turun */}
                   {compareData.previous?.amount > 0 && (
                     <div style={{
@@ -916,9 +954,9 @@ export default function LaporanPage() {
               </div>
               {transactions.length === 0 ? (
                 <div className="empty-state">
-                  <div className="empty-state-icon">📭</div>
+                  <div className="empty-state-icon"><Inbox size={22} /></div>
                   <h3>{t('no_transactions')}</h3>
-                  <p>{t('digital_cashbook')}</p>
+                  <p>Tidak ada transaksi pada rentang filter yang dipilih.</p>
                 </div>
               ) : (
                 <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
@@ -945,7 +983,9 @@ export default function LaporanPage() {
                           </td>
                           <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
                           <td style={{ fontWeight: 700, color: t.category === 'pemasukan' ? 'var(--color-success)' : '#ef4444', whiteSpace: 'nowrap' }}>{formatRupiah(t.amount)}</td>
-                          <td className="hide-on-mobile" style={{ fontSize: '0.85rem' }}>{t.member?.name || '-'}</td>
+                          <td className="hide-on-mobile" style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }} title={t.member?.name || '-'}>
+                            {formatMemberName(t.member?.name)}
+                          </td>
                           <td className="hide-on-mobile" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.notes || '-'}</td>
                         </tr>
                       ))}

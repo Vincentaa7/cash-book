@@ -7,10 +7,13 @@ import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import { formatRupiah, formatNumber, formatDate, formatDateInput } from '@/lib/format'
 import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
+import CategoryIcon from '@/components/CategoryIcon'
+import { TableSkeleton } from '@/components/Skeleton'
+import { useToast } from '@/components/ToastContext'
 import {
   Plus, Edit2, Trash2, TrendingUp, TrendingDown,
   Wallet, X, ChevronLeft, ChevronRight, Lock,
-  Coins, ArrowUpRight, ArrowDownRight, Settings2, Calendar
+  Coins, ArrowUpRight, ArrowDownRight, Settings2, Calendar, BookOpen, Check, FileText, Info
 } from 'lucide-react'
 
 const PERSONAL_CATEGORIES = [
@@ -39,6 +42,7 @@ const emptyForm = {
 
 export default function PribadiPage() {
   const { t, language } = useLanguage()
+  const { toast } = useToast()
   useUser()
 
   // Period State (Month & Year)
@@ -85,8 +89,6 @@ export default function PribadiPage() {
   const [deleteItem, setDeleteItem]           = useState(null)
   const [delLoading, setDelLoading]           = useState(false)
 
-  const [msg, setMsg]                         = useState(null) // { type: 'success'|'error', text }
-
   // Fetch transactions & summary for selected period
   const fetchData = useCallback(async (forceRefresh = false) => {
     const params = new URLSearchParams({
@@ -126,8 +128,9 @@ export default function PribadiPage() {
   }, [fetchData])
 
   function showMsg(type, text) {
-    setMsg({ type, text })
-    setTimeout(() => setMsg(null), 3500)
+    const cleanText = String(text || '').replace(/^[✅💰➕🗑️⚠️❌]\s*/, '')
+    if (type === 'success') toast.success(cleanText)
+    else toast.error(cleanText)
   }
 
   // Month navigation handlers
@@ -158,12 +161,14 @@ export default function PribadiPage() {
     setPage(1)
   }
 
-  // Open transaction modal
+  // Open transaction modal (tanggal akurat hingga tanggal 29/30/31 sesuai panjang bulan terpilih)
   function openAddTx() {
     setEditItem(null)
+    const maxDay = new Date(selectedYear, selectedMonth, 0).getDate()
+    const defaultDay = Math.min(new Date().getDate(), maxDay)
     setTxForm({
       ...emptyForm,
-      date: formatDateInput(new Date(selectedYear, selectedMonth - 1, Math.min(new Date().getDate(), 28)))
+      date: formatDateInput(new Date(selectedYear, selectedMonth - 1, defaultDay))
     })
     setShowTxModal(true)
   }
@@ -307,58 +312,47 @@ export default function PribadiPage() {
     <AppShell>
       <div className="page-container">
         {/* Header Section */}
-        <div className="page-header" style={{ flexWrap: 'wrap', gap: 16 }}>
+        <div className="page-header">
           <div>
-            <h1 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {t('personal_ledger')} <span style={{ fontSize: '1.4rem' }}>📓</span>
-            </h1>
-            <p style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              <Lock size={13} /> {t('personal_privacy_note')}
+            <h1>{t('personal_ledger')}</h1>
+            <p style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Lock size={13} /> {t('personal_privacy_note').replace(/^🔒\s*/, '')}
             </p>
           </div>
 
           {/* Action Buttons */}
-          <div className="page-header-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="page-header-actions">
             <button
               className="btn btn-secondary btn-sm"
               onClick={openSetBudget}
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              <Settings2 size={15} /> {t('personal_set_balance')}
+              <Settings2 size={15} strokeWidth={1.85} /> {t('personal_set_balance')}
             </button>
             <button
               className="btn btn-ghost btn-sm"
               onClick={openTopup}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                border: '1.5px solid var(--color-primary-500)',
-                color: 'var(--color-primary-500)'
+                borderColor: 'rgba(13, 148, 136, 0.45)',
+                color: 'var(--color-primary-500)',
               }}
             >
-              <Coins size={15} /> {t('personal_topup_balance')}
+              <Coins size={15} strokeWidth={1.85} /> {t('personal_topup_balance')}
             </button>
-            <button className="btn btn-primary btn-sm" onClick={openAddTx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Plus size={15} /> {t('personal_add')}
+            <button className="btn btn-primary btn-sm" onClick={openAddTx}>
+              <Plus size={15} strokeWidth={2.2} /> {t('personal_add')}
             </button>
           </div>
         </div>
 
-        {/* Status Message Alert */}
-        {msg && (
-          <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-danger'}`} style={{ marginBottom: 20 }}>
-            <span>{msg.text}</span>
-          </div>
-        )}
-
         {/* Month Navigator Toolbar */}
         <div className="card" style={{ marginBottom: 20, padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Calendar size={18} style={{ color: 'var(--color-primary-500)' }} />
-            <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+            <Calendar size={17} style={{ color: 'var(--color-primary-500)' }} />
+            <span style={{ fontWeight: 700, fontSize: '0.96rem', color: 'var(--text-primary)' }}>
               {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
             </span>
             {!isCurrentMonth && (
-              <button className="btn btn-ghost btn-sm" onClick={handleCurrentMonth} style={{ fontSize: '0.75rem', padding: '3px 8px' }}>
+              <button className="btn btn-ghost btn-sm" onClick={handleCurrentMonth} style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
                 Bulan Ini
               </button>
             )}
@@ -366,34 +360,42 @@ export default function PribadiPage() {
 
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn btn-ghost btn-sm" onClick={handlePrevMonth} title="Bulan Sebelumnya">
-              <ChevronLeft size={16} /> Sebelumnya
+              <ChevronLeft size={15} /> Sebelumnya
             </button>
             <button className="btn btn-ghost btn-sm" onClick={handleNextMonth} title="Bulan Berikutnya">
-              Berikutnya <ChevronRight size={16} />
+              Berikutnya <ChevronRight size={15} />
             </button>
           </div>
         </div>
 
         {/* No Budget Prompt Banner */}
         {!summary.hasBudget && (
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.1) 0%, rgba(20, 184, 166, 0.05) 100%)',
-            border: '1.5px dashed var(--color-primary-500)',
-            borderRadius: 16,
-            padding: '16px 20px',
+          <div className="card" style={{
+            padding: '15px 20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             marginBottom: 24,
             flexWrap: 'wrap',
-            gap: 12
+            gap: 12,
+            borderStyle: 'dashed',
+            borderColor: 'rgba(13, 148, 136, 0.35)',
           }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: 2 }}>
-                💡 Saldo Utama Pribadi Belum Diatur
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: 'rgba(13, 148, 136, 0.1)', color: 'var(--color-primary-500)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <Info size={17} />
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Tentukan modal kas pribadi bulan {MONTH_NAMES[selectedMonth - 1]} agar sisa saldo dan batas belanja dapat terpantau rapi.
+              <div>
+                <div style={{ fontWeight: 650, fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: 2 }}>
+                  Saldo Utama Pribadi Belum Diatur
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Tentukan modal kas pribadi bulan {MONTH_NAMES[selectedMonth - 1]} agar sisa saldo terpantau rapi.
+                </div>
               </div>
             </div>
             <button className="btn btn-primary btn-sm" onClick={openSetBudget}>
@@ -402,138 +404,68 @@ export default function PribadiPage() {
           </div>
         )}
 
-        {/* 4 Summary Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+        {/* 4 Clean Monochrome Fintech KPI Cards (Zero Rainbow Gradients) */}
+        <div className="summary-grid" style={{ marginBottom: 24 }}>
           {/* Card 1: Saldo Utama Pribadi */}
-          <div style={{
-            borderRadius: 16, padding: '20px 22px',
-            background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)',
-            color: 'white', boxShadow: '0 8px 20px -6px rgba(13,148,136,0.5)',
-            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-            position: 'relative', overflow: 'hidden'
-          }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Wallet size={16} style={{ opacity: 0.9 }} />
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>
-                    {t('personal_budget_allocated')}
-                  </span>
-                </div>
-                <button
-                  onClick={openTopup}
-                  title="Top-Up Saldo"
-                  style={{
-                    background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 6,
-                    color: 'white', fontSize: '0.7rem', fontWeight: 600, padding: '2px 6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  + Top-Up
-                </button>
-              </div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, lineHeight: 1.2 }}>
-                {formatRupiah(summary.budgetAmount)}
-              </div>
+          <div className="summary-card card-budget">
+            <div className="summary-card-head">
+              <span className="summary-card-label">{t('personal_budget_allocated')}</span>
+              <div className="summary-card-icon"><Wallet size={16} strokeWidth={1.85} /></div>
             </div>
-            <div style={{ fontSize: '0.72rem', opacity: 0.85, marginTop: 10 }}>
-              {summary.hasBudget ? 'Modal Kas Bulan Ini' : 'Belum diatur'}
+            <div className="summary-card-value">{formatRupiah(summary.budgetAmount)}</div>
+            <div className="summary-card-sub" style={{ justifyContent: 'space-between' }}>
+              <span>{summary.hasBudget ? 'Modal Kas Bulan Ini' : 'Belum diatur'}</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={openTopup}
+                style={{ padding: '2px 8px', fontSize: '0.7rem' }}
+              >
+                + Top-Up
+              </button>
             </div>
           </div>
 
           {/* Card 2: Pengeluaran Pribadi */}
-          <div style={{
-            borderRadius: 16, padding: '20px 22px',
-            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-            color: 'white', boxShadow: '0 8px 20px -6px rgba(239,68,68,0.5)',
-            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-          }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <TrendingDown size={16} style={{ opacity: 0.9 }} />
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>
-                  {t('personal_expense')}
-                </span>
-              </div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, lineHeight: 1.2 }}>
-                {formatRupiah(summary.totalExpense)}
-              </div>
+          <div className="summary-card card-expense">
+            <div className="summary-card-head">
+              <span className="summary-card-label">{t('personal_expense')}</span>
+              <div className="summary-card-icon"><TrendingDown size={16} strokeWidth={1.85} /></div>
             </div>
-            <div style={{ fontSize: '0.72rem', opacity: 0.85, marginTop: 10 }}>
+            <div className="summary-card-value" style={{ color: 'var(--color-danger)' }}>{formatRupiah(summary.totalExpense)}</div>
+            <div className="summary-card-sub tabular-nums">
               {summary.hasBudget ? `${summary.usagePercent}% dari saldo utama` : 'Total belanja bulan ini'}
             </div>
           </div>
 
           {/* Card 3: Pemasukan Tambahan */}
-          <div style={{
-            borderRadius: 16, padding: '20px 22px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            color: 'white', boxShadow: '0 8px 20px -6px rgba(16,185,129,0.5)',
-            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-          }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <TrendingUp size={16} style={{ opacity: 0.9 }} />
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>
-                  {t('personal_income')}
-                </span>
-              </div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, lineHeight: 1.2 }}>
-                {formatRupiah(summary.totalIncome)}
-              </div>
+          <div className="summary-card card-balance">
+            <div className="summary-card-head">
+              <span className="summary-card-label">{t('personal_income')}</span>
+              <div className="summary-card-icon"><TrendingUp size={16} strokeWidth={1.85} /></div>
             </div>
-            <div style={{ fontSize: '0.72rem', opacity: 0.85, marginTop: 10 }}>
-              Top-up & pemasukan tambahan
-            </div>
+            <div className="summary-card-value" style={{ color: 'var(--color-success)' }}>{formatRupiah(summary.totalIncome)}</div>
+            <div className="summary-card-sub">Top-up &amp; pemasukan tambahan</div>
           </div>
 
           {/* Card 4: Sisa Saldo Kas */}
-          <div style={{
-            borderRadius: 16, padding: '20px 22px',
-            background: summary.balance >= 0
-              ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-              : 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)',
-            color: 'white',
-            boxShadow: summary.balance >= 0
-              ? '0 8px 20px -6px rgba(59,130,246,0.5)'
-              : '0 8px 20px -6px rgba(168,85,247,0.5)',
-            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-          }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Coins size={16} style={{ opacity: 0.9 }} />
-                  <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>
-                    {t('personal_balance')}
-                  </span>
-                </div>
-                {summary.balance < 0 && (
-                  <span style={{ background: 'rgba(239,68,68,0.3)', padding: '2px 6px', borderRadius: 6, fontSize: '0.68rem', fontWeight: 700 }}>
-                    Defisit
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, lineHeight: 1.2 }}>
-                {formatRupiah(summary.balance)}
-              </div>
+          <div className={`summary-card ${summary.balance < 0 ? 'card-balance-danger' : 'card-history'}`}>
+            <div className="summary-card-head">
+              <span className="summary-card-label">{t('personal_balance')}</span>
+              <div className="summary-card-icon"><Coins size={16} strokeWidth={1.85} /></div>
             </div>
-
-            {/* Mini Progress Bar */}
-            {summary.hasBudget && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{
-                  height: 6, background: 'rgba(255,255,255,0.25)', borderRadius: 99,
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${Math.min(summary.usagePercent, 100)}%`,
-                    background: summary.usagePercent > 100 ? '#f87171' : summary.usagePercent > 85 ? '#fcd34d' : '#ffffff',
-                    borderRadius: 99,
-                    transition: 'width 0.4s ease'
-                  }} />
-                </div>
+            <div className="summary-card-value" style={{ color: summary.balance < 0 ? 'var(--color-danger)' : 'var(--text-primary)' }}>
+              {formatRupiah(summary.balance)}
+            </div>
+            {summary.hasBudget ? (
+              <div className="progress-bar">
+                <div
+                  className={`progress-fill ${summary.usagePercent > 95 ? 'danger' : summary.usagePercent > 80 ? 'warning' : ''}`}
+                  style={{ width: `${Math.min(summary.usagePercent, 100)}%` }}
+                />
               </div>
+            ) : (
+              <div className="summary-card-sub">{summary.balance < 0 ? 'Defisit' : 'Saldo bersih bulan ini'}</div>
             )}
           </div>
         </div>
@@ -562,7 +494,7 @@ export default function PribadiPage() {
               >
                 <option value="">Semua Kategori</option>
                 {PERSONAL_CATEGORIES.map(c => (
-                  <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>
+                  <option key={c.id} value={c.id}>{c.label}</option>
                 ))}
               </select>
 
@@ -584,10 +516,10 @@ export default function PribadiPage() {
 
           {/* Table */}
           {loading ? (
-            <div className="loading-container"><div className="spinner" /><p>{t('loading')}</p></div>
+            <TableSkeleton rows={6} />
           ) : items.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-state-icon">📓</div>
+              <div className="empty-state-icon"><BookOpen size={22} /></div>
               <h3>{t('personal_empty')}</h3>
               <p>{t('personal_empty_sub')}</p>
               <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
@@ -631,14 +563,19 @@ export default function PribadiPage() {
                           <span>{item.itemName}</span>
                         </div>
                         {item.notes && (
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>📝 {item.notes}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <FileText size={11} /> {item.notes}
+                          </div>
                         )}
                         <div className="show-on-mobile" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                          {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.emoji} {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+                          {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
                         </div>
                       </td>
                       <td className="hide-on-mobile" style={{ fontSize: '0.82rem' }}>
-                        {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.emoji} {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}>
+                          <CategoryIcon category={item.category} size={13} />
+                          {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+                        </span>
                       </td>
                       <td style={{
                         textAlign: 'right', fontWeight: 700, fontSize: '0.85rem',
@@ -705,8 +642,8 @@ export default function PribadiPage() {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 460 }}>
             <div className="modal-header">
-              <h3 className="modal-title">💰 {t('personal_set_balance')}</h3>
-              <button className="btn-icon" onClick={() => setShowBudgetModal(false)}>✕</button>
+              <h3 className="modal-title"><Wallet size={17} /> {t('personal_set_balance')}</h3>
+              <button className="btn-icon" onClick={() => setShowBudgetModal(false)}><X size={16} /></button>
             </div>
             <form onSubmit={handleSaveBudget}>
               <div className="modal-body" style={{ display: 'grid', gap: 16 }}>
@@ -754,7 +691,7 @@ export default function PribadiPage() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowBudgetModal(false)}>{t('cancel')}</button>
                 <button type="submit" className="btn btn-primary" disabled={budgetLoading}>
-                  {budgetLoading ? t('loading') : `✅ ${t('save')}`}
+                  {budgetLoading ? <span className="btn-shimmer-dot" /> : <><Check size={15} /> {t('save')}</>}
                 </button>
               </div>
             </form>
@@ -767,8 +704,8 @@ export default function PribadiPage() {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 460 }}>
             <div className="modal-header">
-              <h3 className="modal-title">➕ {t('personal_topup_balance')}</h3>
-              <button className="btn-icon" onClick={() => setShowTopupModal(false)}>✕</button>
+              <h3 className="modal-title"><Coins size={17} /> {t('personal_topup_balance')}</h3>
+              <button className="btn-icon" onClick={() => setShowTopupModal(false)}><X size={16} /></button>
             </div>
             <form onSubmit={handleSaveTopup}>
               <div className="modal-body" style={{ display: 'grid', gap: 16 }}>
@@ -827,7 +764,7 @@ export default function PribadiPage() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowTopupModal(false)}>{t('cancel')}</button>
                 <button type="submit" className="btn btn-primary" disabled={topupLoading}>
-                  {topupLoading ? t('loading') : '➕ Tambah Saldo'}
+                  {topupLoading ? <span className="btn-shimmer-dot" /> : <><Plus size={15} /> Tambah Saldo</>}
                 </button>
               </div>
             </form>
@@ -841,52 +778,71 @@ export default function PribadiPage() {
           <div className="modal" style={{ maxWidth: 520 }}>
             <div className="modal-header">
               <h3 className="modal-title">
-                {editItem ? `✏️ ${t('edit')} Catatan` : `➕ ${t('personal_add')}`}
+                {editItem ? <><Edit2 size={16} /> {t('edit')} Catatan</> : <><Plus size={16} /> {t('personal_add')}</>}
               </h3>
-              <button className="btn-icon" onClick={() => setShowTxModal(false)}>✕</button>
+              <button className="btn-icon" onClick={() => setShowTxModal(false)}><X size={16} /></button>
             </div>
             <form onSubmit={handleSaveTx}>
               <div className="modal-body" style={{ display: 'grid', gap: 16 }}>
-                {/* Tipe Transaksi */}
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Tipe Transaksi</label>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {['expense', 'income'].map(tp => (
-                      <button
-                        key={tp} type="button"
-                        onClick={() => setTxForm(f => ({ ...f, type: tp }))}
-                        style={{
-                          flex: 1, padding: '10px', borderRadius: 10, border: '2px solid',
-                          borderColor: txForm.type === tp
-                            ? (tp === 'income' ? 'var(--color-success)' : '#ef4444')
-                            : 'var(--border-color)',
-                          background: txForm.type === tp
-                            ? (tp === 'income' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.08)')
-                            : 'var(--bg-secondary)',
-                          color: txForm.type === tp
-                            ? (tp === 'income' ? 'var(--color-success)' : '#ef4444')
-                            : 'var(--text-secondary)',
-                          fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-                        }}
-                      >
-                        {tp === 'income' ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
-                        {tp === 'income' ? t('personal_type_income') : t('personal_type_expense')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Tipe Transaksi (dikunci jika sedang edit Top-Up Saldo Utama) */}
+                {(() => {
+                  const isEditingTopup = editItem?.itemName === 'Tambah Saldo (Top-Up)' && editItem?.type === 'income'
+                  return (
+                    <>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>Tipe Transaksi</span>
+                          {isEditingTopup && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <Lock size={11} /> Terkunci (Top-Up)
+                            </span>
+                          )}
+                        </label>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                          {['expense', 'income'].map(tp => (
+                            <button
+                              key={tp} type="button"
+                              disabled={isEditingTopup}
+                              onClick={() => !isEditingTopup && setTxForm(f => ({ ...f, type: tp }))}
+                              style={{
+                                flex: 1, padding: '10px', borderRadius: 10, border: '1.5px solid',
+                                borderColor: txForm.type === tp
+                                  ? (tp === 'income' ? 'var(--color-success)' : 'var(--color-danger)')
+                                  : 'var(--border-color)',
+                                background: txForm.type === tp
+                                  ? (tp === 'income' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.08)')
+                                  : 'var(--bg-secondary)',
+                                color: txForm.type === tp
+                                  ? (tp === 'income' ? 'var(--color-success)' : 'var(--color-danger)')
+                                  : 'var(--text-secondary)',
+                                fontWeight: 650, cursor: isEditingTopup ? 'not-allowed' : 'pointer',
+                                opacity: isEditingTopup && txForm.type !== tp ? 0.4 : 1,
+                                transition: 'all 0.18s',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                              }}
+                            >
+                              {tp === 'income' ? <ArrowDownRight size={15} /> : <ArrowUpRight size={15} />}
+                              {tp === 'income' ? t('personal_type_income') : t('personal_type_expense')}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                {/* Nama Item */}
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">{t('item_name')} <span className="required">*</span></label>
-                  <input
-                    type="text" className="form-input" required
-                    value={txForm.itemName}
-                    onChange={e => setTxForm(f => ({ ...f, itemName: e.target.value }))}
-                    placeholder="Contoh: Makan siang, Bensin, Gaji freelance..."
-                  />
-                </div>
+                      {/* Nama Item */}
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">{t('item_name')} <span className="required">*</span></label>
+                        <input
+                          type="text" className="form-input" required
+                          value={txForm.itemName}
+                          readOnly={isEditingTopup}
+                          style={isEditingTopup ? { opacity: 0.72, cursor: 'not-allowed' } : {}}
+                          onChange={e => !isEditingTopup && setTxForm(f => ({ ...f, itemName: e.target.value }))}
+                          placeholder="Contoh: Makan siang, Bensin, Gaji freelance..."
+                        />
+                      </div>
+                    </>
+                  )
+                })()}
 
                 {/* Nominal */}
                 <div className="form-group" style={{ margin: 0 }}>
@@ -909,21 +865,18 @@ export default function PribadiPage() {
                 {/* Kategori Visual Grid */}
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Kategori <span className="required">*</span></label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
+                  <div className="category-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))' }}>
                     {PERSONAL_CATEGORIES.map(c => (
                       <button
                         key={c.id} type="button"
                         onClick={() => setTxForm(f => ({ ...f, category: c.id }))}
-                        style={{
-                          padding: '8px 6px', borderRadius: 8, border: '2px solid',
-                          borderColor: txForm.category === c.id ? 'var(--color-primary-600)' : 'var(--border-color)',
-                          background: txForm.category === c.id ? 'var(--color-primary-hover)' : 'var(--bg-secondary)',
-                          color: txForm.category === c.id ? 'var(--color-primary-600)' : 'var(--text-secondary)',
-                          fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
-                        }}
+                        className={`category-grid-item ${txForm.category === c.id ? 'active' : ''}`}
+                        style={{ padding: '10px 6px' }}
                       >
-                        <div style={{ fontSize: '1.2rem', marginBottom: 3 }}>{c.emoji}</div>
-                        {c.label}
+                        <span className="category-grid-item-icon" style={{ width: 28, height: 28 }}>
+                          <CategoryIcon category={c.id} size={15} />
+                        </span>
+                        <span className="category-grid-item-label">{c.label}</span>
                       </button>
                     ))}
                   </div>
@@ -954,7 +907,7 @@ export default function PribadiPage() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowTxModal(false)}>{t('cancel')}</button>
                 <button type="submit" className="btn btn-primary" disabled={txLoading}>
-                  {txLoading ? t('loading') : `✅ ${t('save')}`}
+                  {txLoading ? <span className="btn-shimmer-dot" /> : <><Check size={15} /> {t('save')}</>}
                 </button>
               </div>
             </form>
@@ -967,15 +920,15 @@ export default function PribadiPage() {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 400 }}>
             <div className="modal-header">
-              <h3 className="modal-title">🗑️ {t('delete')} Catatan</h3>
-              <button className="btn-icon" onClick={() => setDeleteItem(null)}>✕</button>
+              <h3 className="modal-title"><Trash2 size={16} /> {t('delete')} Catatan</h3>
+              <button className="btn-icon" onClick={() => setDeleteItem(null)}><X size={16} /></button>
             </div>
             <div className="modal-body">
               <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>{t('personal_confirm_delete')}</p>
-              <div style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 14 }}>
+              <div style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 14 }}>
                 <div style={{ fontWeight: 600 }}>{deleteItem.itemName}</div>
-                <div style={{
-                  color: deleteItem.type === 'income' ? 'var(--color-success)' : '#ef4444',
+                <div className="tabular-nums" style={{
+                  color: deleteItem.type === 'income' ? 'var(--color-success)' : 'var(--color-danger)',
                   fontWeight: 700, fontSize: '1.05rem', marginTop: 4
                 }}>
                   {deleteItem.type === 'income' ? '+' : '-'}{formatRupiah(deleteItem.amount)}
@@ -985,7 +938,7 @@ export default function PribadiPage() {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setDeleteItem(null)}>{t('cancel')}</button>
               <button className="btn btn-danger" onClick={handleDeleteTx} disabled={delLoading}>
-                {delLoading ? t('loading') : `🗑️ ${t('delete')}`}
+                {delLoading ? <span className="btn-shimmer-dot" /> : <><Trash2 size={14} /> {t('delete')}</>}
               </button>
             </div>
           </div>

@@ -1,13 +1,18 @@
-// app/layout.jsx - Root Layout
+// app/layout.jsx - Root Layout (Clean Fintech Typography: Plus Jakarta Sans)
 
 import './globals.css'
-import { Inter } from 'next/font/google'
+import { Plus_Jakarta_Sans } from 'next/font/google'
 
-const inter = Inter({ subsets: ['latin'] })
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-sans',
+  display: 'swap',
+})
 
 export const metadata = {
-  title: 'Cash Book - Buku Keuangan Keluarga',
-  description: 'Aplikasi manajemen keuangan keluarga digital. Catat pengeluaran, pantau kas bulanan, dan buat laporan keuangan dengan mudah.',
+  title: 'Cash Book — Buku Keuangan Keluarga',
+  description: 'Aplikasi manajemen keuangan keluarga digital. Catat pengeluaran, pantau kas bulanan, dan buat laporan keuangan dengan presisi.',
   keywords: 'buku kas, keuangan keluarga, pengeluaran, anggaran, manajemen keuangan',
   manifest: '/manifest.json',
   appleWebApp: {
@@ -31,11 +36,12 @@ export const viewport = {
 
 import { LanguageProvider } from '@/components/LanguageContext'
 import { UserProvider } from '@/components/UserContext'
+import { ToastProvider } from '@/components/ToastContext'
 import PwaRegister from '@/components/PwaRegister'
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="id">
+    <html lang="id" className={plusJakartaSans.variable}>
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="manifest" href="/manifest.json" />
@@ -45,11 +51,13 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
-      <body className={inter.className}>
+      <body className={plusJakartaSans.className}>
         <LanguageProvider>
           <UserProvider>
-            {children}
-            <PwaRegister />
+            <ToastProvider>
+              {children}
+              <PwaRegister />
+            </ToastProvider>
           </UserProvider>
         </LanguageProvider>
       </body>

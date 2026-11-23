@@ -6,10 +6,12 @@ import AppShell from '@/components/AppShell'
 import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
-import { formatRupiah, formatDate, formatDateInput, formatTime } from '@/lib/format'
-import { CATEGORIES, getCategoryInfo, getInitials } from '@/lib/constants'
+import { TableSkeleton } from '@/components/Skeleton'
+import { useToast } from '@/components/ToastContext'
+import { formatRupiah, formatDate, formatDateInput, formatTime, formatMemberName } from '@/lib/format'
+import { CATEGORIES, getInitials } from '@/lib/constants'
 import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
-import { Search, Download, Edit2, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Download, Edit2, Trash2, X, ChevronLeft, ChevronRight, Plus, Inbox, Check, FileText, Pencil } from 'lucide-react'
 import Link from 'next/link'
 
 const DEFAULT_TX_URL = '/api/transactions?page=1&limit=15&sortBy=transactionDate&sortOrder=desc'
@@ -17,6 +19,7 @@ const DEFAULT_TX_URL = '/api/transactions?page=1&limit=15&sortBy=transactionDate
 export default function TransaksiPage() {
   const { t, language } = useLanguage()
   const { user } = useUser()
+  const { toast } = useToast()
   const initialTxCache = peekCache(DEFAULT_TX_URL)
   const initialMembersCache = peekCache('/api/members')
 
@@ -157,7 +160,7 @@ export default function TransaksiPage() {
   async function handleEditSave() {
     const parsedAmt = parseInt(editForm.amount, 10)
     if (!editForm.itemName?.trim() || !Number.isSafeInteger(parsedAmt) || parsedAmt <= 0 || !editForm.transactionDate) {
-      alert('Pastikan nama item, tanggal, dan nominal (> 0) terisi dengan benar.')
+      toast.error('Pastikan nama item, tanggal, dan nominal (> 0) terisi dengan benar.')
       return
     }
     setEditLoading(true)
@@ -170,15 +173,17 @@ export default function TransaksiPage() {
       if (res.ok) {
         const { transaction: updatedTx } = await res.json()
         setEditTx(null)
-        // Optimistic update langsung ke tabel tanpa menunggu spinner
         setTransactions(prev => prev.map(item => item.id === updatedTx.id ? updatedTx : item))
         invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
         fetchTransactions(true)
+        toast.success('Perubahan transaksi berhasil disimpan')
       } else {
         const err = await res.json().catch(() => ({}))
-        alert(err.error || 'Gagal menyimpan perubahan transaksi.')
+        toast.error(err.error || 'Gagal menyimpan perubahan transaksi.')
       }
-    } catch {}
+    } catch {
+      toast.error('Gagal terhubung ke server.')
+    }
     setEditLoading(false)
   }
 
@@ -190,7 +195,6 @@ export default function TransaksiPage() {
       const res = await fetch(`/api/transactions/${targetId}`, { method: 'DELETE' })
       if (res.ok) {
         setDeleteTx(null)
-        // Optimistic update: langsung hilangkan baris dari tabel
         setTransactions(prev => prev.filter(item => item.id !== targetId))
         setTotal(prev => Math.max(0, prev - 1))
         if (deleteTx?.category === 'pemasukan') {
@@ -200,8 +204,14 @@ export default function TransaksiPage() {
         }
         invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
         fetchTransactions(true)
+        toast.success('Transaksi berhasil dihapus')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'Gagal menghapus transaksi.')
       }
-    } catch {}
+    } catch {
+      toast.error('Gagal terhubung ke server.')
+    }
     setDeleteLoading(false)
   }
 
@@ -210,15 +220,15 @@ export default function TransaksiPage() {
       <div className="page-container">
         <div className="page-header">
           <div>
-            <h1>{t('history')} 📋</h1>
-            <p>{t('digital_cashbook')}</p>
+            <h1>{t('history')}</h1>
+            <p>Kelola, filter, dan audit seluruh catatan transaksi kas keluarga</p>
           </div>
           <div className="page-header-actions">
             <button className="btn btn-ghost btn-sm" onClick={handleExport}>
-              <Download size={15} /> {t('actions')} CSV
+              <Download size={15} strokeWidth={1.85} /> Export CSV
             </button>
             <Link href="/transaksi/baru" className="btn btn-primary btn-sm">
-              + {t('add_expense')}
+              <Plus size={15} strokeWidth={2.2} /> {t('add_expense')}
             </Link>
           </div>
         </div>
@@ -246,9 +256,9 @@ export default function TransaksiPage() {
               >
                 <option value="">{t('all_categories')}</option>
                 {CATEGORIES.map(c => (
-                  <option key={c.id} value={c.id}>{c.emoji} {t(c.labelKey)}</option>
+                  <option key={c.id} value={c.id}>{t(c.labelKey)}</option>
                 ))}
-                <option value="pemasukan">💰 {t('cat_pemasukan')}</option>
+                <option value="pemasukan">{t('cat_pemasukan')}</option>
               </select>
               <select
                 className="form-select"
@@ -258,7 +268,7 @@ export default function TransaksiPage() {
               >
                 <option value="">{t('all_members')}</option>
                 {members.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
+                  <option key={m.id} value={m.id}>{formatMemberName(m.name)}</option>
                 ))}
               </select>
             </div>
@@ -335,12 +345,12 @@ export default function TransaksiPage() {
 
           {/* Table */}
           {loading ? (
-            <div className="loading-container"><div className="spinner" /><p>{t('loading')}</p></div>
+            <TableSkeleton rows={8} />
           ) : transactions.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-state-icon">📭</div>
+              <div className="empty-state-icon"><Inbox size={22} /></div>
               <h3>{t('no_transactions')}</h3>
-              <p>{t('digital_cashbook')}</p>
+              <p>Ubah filter pencarian atau tambahkan catatan pengeluaran baru.</p>
             </div>
           ) : (
             <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
@@ -378,29 +388,29 @@ export default function TransaksiPage() {
                             <CategoryBadge category={tx.category} size="xs" />
                           </div>
                           {tx.notes && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                              📝 {tx.notes}
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <FileText size={11} /> {tx.notes}
                             </div>
                           )}
                           {tx.updatedAt && tx.editedByName && (
                             <div style={{
                               fontSize: '0.68rem',
-                              color: '#f59e0b',
+                              color: 'var(--color-warning)',
                               marginTop: 4,
                               display: 'flex',
                               alignItems: 'center',
-                              gap: 3,
+                              gap: 4,
                               flexWrap: 'wrap',
                             }}>
-                              ✏️ <span style={{ fontWeight: 600 }}>{t('last_edited')}: {tx.editedByName}</span>
+                              <Pencil size={10} /> <span style={{ fontWeight: 600 }} title={tx.editedByName}>{t('last_edited')}: {formatMemberName(tx.editedByName)}</span>
                               <span style={{ opacity: 0.7 }}>·</span>
                               <span style={{ opacity: 0.85 }}>{formatDate(tx.updatedAt, language)} {formatTime(tx.updatedAt, language)}</span>
                             </div>
                           )}
                         </td>
                         <td className="hide-on-mobile"><CategoryBadge category={tx.category} size="sm" /></td>
-                        <td style={{ fontWeight: 700, color: tx.category === 'pemasukan' ? 'var(--color-success)' : '#ef4444', textAlign: 'right', fontSize: '0.85rem' }}>
-                          {formatRupiah(tx.amount)}
+                        <td className="tabular-nums" style={{ fontWeight: 650, color: tx.category === 'pemasukan' ? 'var(--color-success)' : 'var(--color-danger)', textAlign: 'right', fontSize: '0.855rem' }}>
+                          {tx.category === 'pemasukan' ? '+' : '-'}{formatRupiah(tx.amount)}
                         </td>
                         <td className="hide-on-mobile">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -412,7 +422,9 @@ export default function TransaksiPage() {
                             }}>
                               {getInitials(tx.member?.name || '?')}
                             </div>
-                            <span style={{ fontSize: '0.85rem' }}>{tx.member?.name || '-'}</span>
+                            <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }} title={tx.member?.name || '-'}>
+                              {formatMemberName(tx.member?.name)}
+                            </span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'center', padding: '8px 4px' }}>
@@ -517,7 +529,7 @@ export default function TransaksiPage() {
                 <label className="form-label">{t('category')}</label>
                 {editTx.category === 'pemasukan' ? (
                   <select className="form-select" value="pemasukan" disabled style={{ opacity: 0.75, cursor: 'not-allowed' }}>
-                    <option value="pemasukan">💰 {t('cat_pemasukan')}</option>
+                    <option value="pemasukan">{t('cat_pemasukan')}</option>
                   </select>
                 ) : (
                   <select
@@ -526,7 +538,7 @@ export default function TransaksiPage() {
                     onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
                   >
                     {CATEGORIES.map(c => (
-                      <option key={c.id} value={c.id}>{c.emoji} {t(c.labelKey)}</option>
+                      <option key={c.id} value={c.id}>{t(c.labelKey)}</option>
                     ))}
                   </select>
                 )}
@@ -553,7 +565,7 @@ export default function TransaksiPage() {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setEditTx(null)}>{t('cancel')}</button>
               <button className="btn btn-primary" onClick={handleEditSave} disabled={editLoading}>
-                {editLoading ? t('loading') : `✅ ${t('save')}`}
+                {editLoading ? <span className="btn-shimmer-dot" /> : <><Check size={15} /> {t('save')}</>}
               </button>
             </div>
           </div>
@@ -566,15 +578,15 @@ export default function TransaksiPage() {
           <div className="modal">
             <div className="modal-header">
               <h3 className="modal-title">{t('delete')}</h3>
-              <button className="btn-icon" onClick={() => setDeleteTx(null)}>✕</button>
+              <button className="btn-icon" onClick={() => setDeleteTx(null)}><X size={16} /></button>
             </div>
             <div className="modal-body">
               <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
                 {t('personal_confirm_delete')}
               </p>
-              <div style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 14 }}>
+              <div style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 14 }}>
                 <div style={{ fontWeight: 600 }}>{deleteTx.itemName}</div>
-                <div style={{ color: '#ef4444', fontWeight: 700, fontSize: '1.1rem' }}>
+                <div className="tabular-nums" style={{ color: 'var(--color-danger)', fontWeight: 700, fontSize: '1.05rem', marginTop: 4 }}>
                   {formatRupiah(deleteTx.amount)}
                 </div>
               </div>
@@ -582,7 +594,7 @@ export default function TransaksiPage() {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setDeleteTx(null)}>{t('cancel')}</button>
               <button className="btn btn-danger" onClick={handleDelete} disabled={deleteLoading}>
-                {deleteLoading ? t('loading') : `🗑️ ${t('delete')}`}
+                {deleteLoading ? <span className="btn-shimmer-dot" /> : <><Trash2 size={14} /> {t('delete')}</>}
               </button>
             </div>
           </div>

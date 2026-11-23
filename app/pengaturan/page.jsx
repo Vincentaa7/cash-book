@@ -2,24 +2,26 @@
 // app/pengaturan/page.jsx - Halaman Pengaturan (Khusus Admin)
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import AppShell from '@/components/AppShell'
 import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
-import { formatNumber, formatDate, formatTime } from '@/lib/format'
+import { SettingsBlockSkeleton, TableSkeleton } from '@/components/Skeleton'
+import { useToast } from '@/components/ToastContext'
+import { formatNumber, formatDate, formatTime, formatMemberName } from '@/lib/format'
 import { AVATAR_COLORS } from '@/lib/constants'
 import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
-import { Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle, Shield, Database, Trash, ClipboardList, KeyRound, Copy, RefreshCw } from 'lucide-react'
+import {
+  Settings, Users, Wallet, Check, AlertCircle, Edit2, Trash2, PlusCircle,
+  Shield, Database, Trash, ClipboardList, KeyRound, Copy, RefreshCw, Bell, Lock, X, CheckCircle2, XCircle
+} from 'lucide-react'
 import DailyReminderSetup from '@/components/DailyReminderSetup'
 
 function PengaturanContent() {
-  const router = useRouter()
   const { t, language, changeLanguage } = useLanguage()
   const { user, familyName, setFamilyName } = useUser()
+  const { toast, confirmDialog } = useToast()
   const [activeTab, setActiveTab] = useState('budget')
   const [loading, setLoading] = useState(false)
-  const [successMsg, setSuccessMsg] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
 
   // Database cleanup state
   const [dbPreview, setDbPreview] = useState(null)
@@ -116,7 +118,14 @@ function PengaturanContent() {
 
   async function handleCleanup() {
     if (!dbPreview || dbPreview.eligible === 0) return
-    if (!confirm(t('db_confirm').replace('{count}', dbPreview.eligible))) return
+    const ok = await confirmDialog({
+      title: 'Arsipkan & Hapus Transaksi Lama',
+      message: t('db_confirm').replace('{count}', dbPreview.eligible),
+      confirmText: `Arsipkan ${dbPreview.eligible} Transaksi`,
+      cancelText: t('cancel'),
+      variant: 'danger',
+    })
+    if (!ok) return
     setDbLoading(true)
     try {
       const res = await fetch('/api/cleanup', { method: 'POST' })
@@ -181,16 +190,10 @@ function PengaturanContent() {
 
   function showMessage(type, text) {
     if (type === 'success') {
-      setSuccessMsg(text)
-      setErrorMsg('')
+      toast.success(text)
     } else {
-      setErrorMsg(text)
-      setSuccessMsg('')
+      toast.error(text)
     }
-    setTimeout(() => {
-      setSuccessMsg('')
-      setErrorMsg('')
-    }, 3000)
   }
 
   // --- Budget Handlers ---
@@ -201,8 +204,14 @@ function PengaturanContent() {
       return
     }
 
-    // Alert Konfirmasi untuk set pertama kali
-    if (!confirm(t('confirm_budget_msg'))) return
+    const ok = await confirmDialog({
+      title: 'Konfirmasi Kas Bulanan',
+      message: t('confirm_budget_msg'),
+      confirmText: t('save'),
+      cancelText: t('cancel'),
+      variant: 'primary',
+    })
+    if (!ok) return
 
     setLoading(true)
     try {
@@ -382,7 +391,14 @@ function PengaturanContent() {
       return showMessage('error', t('required_field'))
     }
 
-    if(confirm(`Yakin ingin ${currentStatus ? 'menonaktifkan' : 'mengaktifkan'} anggota ini?`)) {
+    const ok = await confirmDialog({
+      title: currentStatus ? 'Nonaktifkan Anggota' : 'Aktifkan Anggota',
+      message: `Yakin ingin ${currentStatus ? 'menonaktifkan' : 'mengaktifkan'} anggota ini?`,
+      confirmText: currentStatus ? 'Nonaktifkan' : 'Aktifkan',
+      cancelText: t('cancel'),
+      variant: currentStatus ? 'danger' : 'primary',
+    })
+    if (ok) {
       setLoading(true)
       try {
         const res = await fetch(`/api/members/${id}`, {
@@ -431,21 +447,11 @@ function PengaturanContent() {
     <>
       <div className="page-container">
         <div className="page-header">
-           <h1>{t('settings')} ⚙️</h1>
-           <p>{t('budget_settings')}, {t('family_members')}, {t('app_preferences')}</p>
+          <div>
+            <h1>{t('settings')}</h1>
+            <p>{t('budget_settings')}, {t('family_members')}, &amp; {t('app_preferences')}</p>
+          </div>
         </div>
-
-        {/* Global Messages */}
-        {successMsg && (
-          <div className="alert alert-success">
-            <Check size={16} /> <span>{successMsg}</span>
-          </div>
-        )}
-        {errorMsg && (
-          <div className="alert alert-danger">
-            <AlertCircle size={16} /> <span>{errorMsg}</span>
-          </div>
-        )}
 
         <div className="settings-container">
           {/* Tabs Sidebar */}
@@ -538,16 +544,16 @@ function PengaturanContent() {
                     </div>
                     {isAdminOrSuper && initialBudget === 0 && (
                       <button type="submit" className="btn btn-primary" disabled={loading}>
-                        {loading ? t('loading') : t('save')}
+                        {loading ? <span className="btn-shimmer-dot" /> : t('save')}
                       </button>
                     )}
                   </form>
 
                   {/* Add Cash (Top-up) - Only visible if budget exists and user is admin/superadmin */}
                   {isAdminOrSuper && initialBudget > 0 && (
-                    <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 16, border: '1px dashed var(--border-color)', width: '100%', boxSizing: 'border-box', transition: 'background-color 0.3s ease, border-color 0.3s ease' }}>
-                      <h4 style={{ margin: '0 0 14px 0', fontSize: '1rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                         <PlusCircle size={18} color="#10b981" /> {t('add_cash')}
+                    <div style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: 12, border: '1px dashed var(--border-color)', width: '100%', boxSizing: 'border-box' }}>
+                      <h4 style={{ margin: '0 0 14px 0', fontSize: '0.94rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                         <PlusCircle size={17} color="var(--color-success)" /> {t('add_cash')}
                       </h4>
                       <form onSubmit={handleAddBudget} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', width: '100%' }}>
                         <div className="form-group" style={{ margin: 0, flex: '1 1 180px', minWidth: 0, width: '100%' }}>
@@ -556,7 +562,7 @@ function PengaturanContent() {
                             <input
                               type="text"
                               inputMode="numeric"
-                              className="form-input"
+                              className="form-input tabular-nums"
                               style={{ paddingLeft: 40, width: '100%', boxSizing: 'border-box' }}
                               placeholder="0"
                               value={addAmount ? formatNumber(parseInt(addAmount)) : ''}
@@ -567,8 +573,8 @@ function PengaturanContent() {
                             />
                           </div>
                         </div>
-                        <button type="submit" className="btn btn-primary" style={{ flex: '1 1 130px', minHeight: 42 }} disabled={loading}>
-                          {loading ? t('loading') : `+ ${t('add_cash')}`}
+                        <button type="submit" className="btn btn-primary" style={{ flex: '1 1 130px', minHeight: 40 }} disabled={loading}>
+                          {loading ? <span className="btn-shimmer-dot" /> : `+ ${t('add_cash')}`}
                         </button>
                       </form>
                     </div>
@@ -684,8 +690,15 @@ function PengaturanContent() {
                                   {m.name.substring(0,2).toUpperCase()}
                                 </div>
                                 <div style={{ minWidth: 0, flex: 1 }}>
-                                  <span style={{ fontWeight: 500, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{m.name}</span>
-                                  {m.id === user.id && <span className="badge badge-gray" style={{ marginTop: 2, display: 'inline-flex' }}>{t('you_label')}</span>}
+                                  <span style={{ fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }} title={m.name}>
+                                    {formatMemberName(m.name)}
+                                  </span>
+                                  {m.name.includes('@') && (
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
+                                      {m.name}
+                                    </span>
+                                  )}
+                                  {m.id === user.id && <span className="badge badge-gray" style={{ marginTop: 3, display: 'inline-flex' }}>{t('you_label')}</span>}
                                 </div>
                               </div>
                             </td>
@@ -718,7 +731,9 @@ function PengaturanContent() {
                                   </button>
                                 )}
                                 {m.role === 'superadmin' && m.id !== user.id && (
-                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '0 4px' }}>🔒 Terlindungi</span>
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 4px' }}>
+                                    <Lock size={12} /> Terlindungi
+                                  </span>
                                 )}
                               </div>
                             </td>
@@ -784,7 +799,7 @@ function PengaturanContent() {
                     </div>
                     {isAdminOrSuper && (
                       <button type="submit" className="btn btn-primary" disabled={loading}>
-                        {loading ? t('loading') : t('save')}
+                        {loading ? <span className="btn-shimmer-dot" /> : t('save')}
                       </button>
                     )}
                   </form>
@@ -793,10 +808,10 @@ function PengaturanContent() {
 
                   {/* Pengingat Harian */}
                   <div>
-                    <h4 style={{ fontWeight: 700, marginBottom: 4, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      🔔 {t('reminder_title')}
+                    <h4 style={{ fontWeight: 650, marginBottom: 4, fontSize: '0.96rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Bell size={16} style={{ color: 'var(--color-primary-500)' }} /> {t('reminder_title')}
                     </h4>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 16, marginTop: 4 }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.84rem', marginBottom: 16, marginTop: 4 }}>
                       {t('reminder_subtitle')}
                     </p>
                     <DailyReminderSetup familyName={familyName || 'Cash Book'} />
@@ -808,41 +823,36 @@ function PengaturanContent() {
             {user?.role === 'superadmin' && activeTab === 'database' && (
               <div className="card fade-in-up">
                 <div className="card-header">
-                  <h3 className="card-title"><Database size={18} /> {t('db_management')}</h3>
+                  <h3 className="card-title"><Database size={17} style={{ color: 'var(--color-primary-500)' }} /> {t('db_management')}</h3>
                 </div>
                 <div className="card-body">
-                  <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: '0.9rem', lineHeight: 1.6 }}>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: '0.88rem', lineHeight: 1.6 }}>
                     {t('db_description')}
                   </p>
 
                   {/* Info box */}
                   <div style={{ background: 'var(--bg-tertiary)', borderRadius: 12, padding: 16, marginBottom: 24, border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontWeight: 600 }}>
-                      <span>✅</span> {t('db_kept_title')}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, fontWeight: 600, fontSize: '0.88rem' }}>
+                      <CheckCircle2 size={15} style={{ color: 'var(--color-success)' }} /> {t('db_kept_title')}
                     </div>
-                    <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.8 }}>
+                    <ul style={{ margin: 0, paddingLeft: 22, color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.8 }}>
                       <li>{t('db_kept_1')}</li>
                       <li>{t('db_kept_2')}</li>
                       <li>{t('db_kept_3')}</li>
                       <li>{t('db_kept_4')}</li>
                     </ul>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, marginTop: 16, fontWeight: 600 }}>
-                      <span>❌</span> {t('db_deleted_title')}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, marginTop: 16, fontWeight: 600, fontSize: '0.88rem' }}>
+                      <XCircle size={15} style={{ color: 'var(--color-danger)' }} /> {t('db_deleted_title')}
                     </div>
-                    <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.8 }}>
+                    <ul style={{ margin: 0, paddingLeft: 22, color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.8 }}>
                       <li>{t('db_deleted_1')}</li>
                       <li>{t('db_deleted_2')}</li>
                       <li>{t('db_deleted_3')}</li>
                     </ul>
                   </div>
 
-                  {/* Preview hasil */}
-                  {dbLoading && (
-                    <div className="loading-container" style={{ padding: 20 }}>
-                      <div className="spinner" />
-                      <p>{t('db_analyzing')}</p>
-                    </div>
-                  )}
+                  {/* Preview hasil (Skeleton Shimmer) */}
+                  {dbLoading && <SettingsBlockSkeleton rows={3} />}
 
                   {!dbLoading && dbPreview && (
                     <div style={{ marginBottom: 24 }}>
@@ -919,7 +929,7 @@ function PengaturanContent() {
                         onClick={fetchDbPreview}
                         style={{ marginTop: 16 }}
                       >
-                        🔄 {t('db_btn_recheck')}
+                        <RefreshCw size={15} /> {t('db_btn_recheck')}
                       </button>
                     </div>
                   )}
@@ -936,18 +946,15 @@ function PengaturanContent() {
             {user?.role === 'superadmin' && activeTab === 'activityLog' && (
               <div className="card fade-in-up">
                 <div className="card-header">
-                  <h3 className="card-title">📋 {t('db_log')}</h3>
+                  <h3 className="card-title"><ClipboardList size={17} style={{ color: 'var(--color-primary-500)' }} /> {t('db_log')}</h3>
                 </div>
                 <div className="card-body">
-                  <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: '0.9rem' }}>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: '0.88rem' }}>
                     {t('db_log_desc')}
                   </p>
 
                   {logsLoading ? (
-                    <div className="loading-container" style={{ padding: 20 }}>
-                      <div className="spinner" />
-                      <p>{t('loading')}</p>
-                    </div>
+                    <TableSkeleton rows={7} />
                   ) : activityLogs.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
                       {t('no_activity_logs')}
@@ -985,14 +992,14 @@ function PengaturanContent() {
                                       {log.member?.name?.substring(0, 2).toUpperCase() || 'S'}
                                     </div>
                                     <span style={{
-                                      fontWeight: 500,
-                                      fontSize: '0.78rem',
+                                      fontWeight: 600,
+                                      fontSize: '0.8rem',
                                       overflow: 'hidden',
                                       textOverflow: 'ellipsis',
                                       whiteSpace: 'nowrap',
                                       minWidth: 0,
                                       flex: 1
-                                    }}>{log.member?.name || 'Sistem'}</span>
+                                    }} title={log.member?.name || 'Sistem'}>{log.member?.name ? formatMemberName(log.member.name) : 'Sistem'}</span>
                                   </div>
                                 </td>
                                 <td>
@@ -1019,8 +1026,8 @@ function PengaturanContent() {
                                 >
                                   {log.member?.name?.substring(0, 2).toUpperCase() || 'S'}
                                 </div>
-                                <span className="activity-log-actor-name">
-                                  {log.member?.name || 'Sistem'}
+                                <span className="activity-log-actor-name" title={log.member?.name || 'Sistem'}>
+                                  {log.member?.name ? formatMemberName(log.member.name) : 'Sistem'}
                                 </span>
                               </div>
                               <div className="activity-log-card-time">
@@ -1090,7 +1097,7 @@ function PengaturanContent() {
           <div className="modal">
             <div className="modal-header">
               <h3 className="modal-title">{editMember ? t('edit_member') : t('add_member')}</h3>
-              <button className="btn-icon" onClick={() => setShowMemberModal(false)}>✕</button>
+              <button className="btn-icon" onClick={() => setShowMemberModal(false)}><X size={16} /></button>
             </div>
             <form onSubmit={handleSaveMember}>
               <div className="modal-body" style={{ display: 'grid', gap: 16 }}>
@@ -1186,7 +1193,7 @@ function PengaturanContent() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowMemberModal(false)}>{t('cancel')}</button>
                 <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? t('loading') : `✅ ${t('save')}`}
+                  {loading ? <span className="btn-shimmer-dot" /> : <><Check size={15} /> {t('save')}</>}
                 </button>
               </div>
             </form>

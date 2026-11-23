@@ -16,6 +16,50 @@ export async function GET(request) {
 
     const familyId = session.familyId || '1'
     const { searchParams } = new URL(request.url)
+
+    // Mode cepat: ambil 6 template transaksi pengeluaran paling sering dicatat (1-Tap Quick-Add)
+    if (searchParams.get('frequent') === 'true') {
+      const recentRows = await prisma.transaction.findMany({
+        where: {
+          familyId,
+          category: { not: 'pemasukan' },
+        },
+        select: {
+          itemName: true,
+          category: true,
+          amount: true,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        take: 150,
+      })
+
+      const freqMap = new Map()
+      for (const row of recentRows) {
+        const display = (row.itemName || '').trim()
+        if (!display) continue
+        const key = display.toLowerCase()
+        const existing = freqMap.get(key)
+        if (existing) {
+          existing.count += 1
+        } else {
+          // Karena urutan desc, entri pertama adalah nominal & kategori paling baru
+          freqMap.set(key, {
+            itemName: display,
+            category: row.category,
+            amount: Number(row.amount),
+            count: 1,
+          })
+        }
+      }
+
+      const templates = [...freqMap.values()]
+        .filter(item => item.count >= 2)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 6)
+
+      return NextResponse.json({ templates })
+    }
+
     const page = Math.max(1, parseInt(searchParams.get('page')) || 1)
     const isAll = searchParams.get('all') === 'true' || searchParams.get('limit') === 'all' || searchParams.get('limit') === '-1'
     const limitParam = searchParams.get('limit')

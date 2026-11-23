@@ -266,8 +266,7 @@ export default function AiChatWidget() {
           title={t('ai_assistant') || 'Asisten AI Keuangan'}
           aria-label="Buka Chat AI Asisten"
         >
-          <Bot size={24} />
-          <span className="pulse-ring"></span>
+          <Bot size={22} strokeWidth={1.9} />
         </button>
       )}
 
@@ -277,7 +276,9 @@ export default function AiChatWidget() {
           {/* Header */}
           <div className="ai-chat-header">
             <div className="ai-chat-title-container">
-              <div className="ai-chat-header-icon">🤖</div>
+              <div className="ai-chat-header-icon">
+                <Bot size={18} strokeWidth={1.9} />
+              </div>
               <div>
                 <div className="ai-chat-header-name">{t('ai_assistant') || 'Asisten AI Keuangan'}</div>
                 <div className="ai-chat-header-status">
@@ -291,7 +292,7 @@ export default function AiChatWidget() {
               onClick={() => setIsOpen(false)}
               aria-label="Tutup Chat"
             >
-              <X size={18} />
+              <X size={17} />
             </button>
           </div>
 
@@ -303,7 +304,9 @@ export default function AiChatWidget() {
                 className={`ai-message-row ${msg.role === 'user' ? 'user' : 'assistant'}`}
               >
                 {msg.role === 'assistant' && (
-                  <div className="ai-message-avatar">🤖</div>
+                  <div className="ai-message-avatar">
+                    <Bot size={14} strokeWidth={2} />
+                  </div>
                 )}
                 <div className="ai-message-bubble">
                   {msg.role === 'assistant' ? renderFormattedMessage(msg.content) : msg.content}
@@ -311,14 +314,15 @@ export default function AiChatWidget() {
               </div>
             ))}
 
-            {/* Loading Indicator */}
+            {/* Skeleton Shimmer Thinking Indicator */}
             {isLoading && (
               <div className="ai-message-row assistant">
-                <div className="ai-message-avatar">🤖</div>
-                <div className="ai-message-bubble loading">
-                  <span className="dot"></span>
-                  <span className="dot"></span>
-                  <span className="dot"></span>
+                <div className="ai-message-avatar">
+                  <Bot size={14} strokeWidth={2} />
+                </div>
+                <div className="ai-message-bubble" style={{ minWidth: 168, display: 'grid', gap: 7, padding: '12px 14px' }}>
+                  <div className="skeleton-shimmer" style={{ width: '92%', height: 10, borderRadius: 5 }} />
+                  <div className="skeleton-shimmer" style={{ width: '68%', height: 10, borderRadius: 5 }} />
                 </div>
               </div>
             )}

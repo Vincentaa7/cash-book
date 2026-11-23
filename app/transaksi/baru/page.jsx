@@ -4,24 +4,26 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/AppShell'
-import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
+import CategoryIcon from '@/components/CategoryIcon'
 import { CATEGORIES } from '@/lib/constants'
 import { formatRupiah, formatNumber, formatDateInput } from '@/lib/format'
 import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
-import { AlertCircle, ArrowLeft } from 'lucide-react'
+import { useToast } from '@/components/ToastContext'
+import { AlertCircle, ArrowLeft, CheckCircle2, Wallet, Save, Check, X, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
 export default function NewTransactionPage() {
   const router = useRouter()
   const { t } = useLanguage()
-  const { user } = useUser()
+  const { toast } = useToast()
 
   const now = new Date()
   const curMonth = now.getMonth() + 1
   const curYear = now.getFullYear()
   const summaryUrl = `/api/dashboard?month=${curMonth}&year=${curYear}&summaryOnly=true`
   const fullDashUrl = `/api/dashboard?month=${curMonth}&year=${curYear}`
+  const frequentUrl = '/api/transactions?frequent=true'
 
   const initialCachedSummary = peekCache(summaryUrl)?.summary || peekCache(fullDashUrl)?.summary || null
 
@@ -40,8 +42,9 @@ export default function NewTransactionPage() {
   )
   const [totalExpense, setTotalExpense] = useState(() => initialCachedSummary?.totalExpense || 0)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [frequentTemplates, setFrequentTemplates] = useState(() => peekCache(frequentUrl)?.templates || [])
 
-  // Ambil info sisa kas bulan ini (cukup 1 endpoint ringan + SWR cache 0ms jika sudah dari Dashboard)
+  // Ambil info sisa kas bulan ini & template sering dicatat
   useEffect(() => {
     router.prefetch('/transaksi')
     async function fetchBudgetSummary() {
@@ -54,7 +57,24 @@ export default function NewTransactionPage() {
       } catch {}
     }
     fetchBudgetSummary()
-  }, [router, summaryUrl])
+
+    cachedFetch(frequentUrl, { ttlMs: 60000 })
+      .then(d => {
+        if (Array.isArray(d?.templates)) setFrequentTemplates(d.templates)
+      })
+      .catch(() => {})
+  }, [router, summaryUrl, frequentUrl])
+
+  function applyFrequentTemplate(tpl) {
+    setForm(prev => ({
+      ...prev,
+      itemName: tpl.itemName,
+      category: tpl.category,
+      amount: String(tpl.amount),
+    }))
+    setErrors({})
+    toast.info(`Template "${tpl.itemName}" diterapkan`)
+  }
 
   function handleAmountChange(e) {
     const raw = e.target.value.replace(/\./g, '').replace(/[^0-9]/g, '')
@@ -122,9 +142,16 @@ export default function NewTransactionPage() {
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', minHeight: '60vh', textAlign: 'center',
           }}>
-            <div style={{ fontSize: '4rem', marginBottom: 16 }}>✅</div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 8 }}>{t('add_expense')} — {t('success')}!</h2>
-            <p style={{ color: 'var(--text-muted)' }}>{t('digital_cashbook')}</p>
+            <div style={{
+              width: 64, height: 64, borderRadius: 16,
+              background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)',
+              color: 'var(--color-success)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginBottom: 18,
+            }}>
+              <CheckCircle2 size={32} strokeWidth={1.9} />
+            </div>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>{t('add_expense')} — {t('success')}</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>Catatan pengeluaran berhasil disimpan ke buku kas.</p>
           </div>
         </div>
       </AppShell>
@@ -137,11 +164,11 @@ export default function NewTransactionPage() {
         <div className="page-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Link href="/transaksi" className="btn-icon">
-              <ArrowLeft size={20} />
+              <ArrowLeft size={19} strokeWidth={1.9} />
             </Link>
             <div>
-              <h1>{t('add_expense')} 📝</h1>
-              <p>{t('digital_cashbook')}</p>
+              <h1>{t('add_expense')}</h1>
+              <p>Catat pengeluaran baru ke buku kas keluarga</p>
             </div>
           </div>
         </div>
@@ -153,10 +180,10 @@ export default function NewTransactionPage() {
               className={`alert ${remaining <= 0 ? 'alert-danger' : remaining / budget.amount < 0.2 ? 'alert-warning' : 'alert-info'}`}
               style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}
             >
-              <span style={{ flex: '0 0 auto', fontSize: '1.15rem', lineHeight: 1 }}>💰</span>
-              <span style={{ flex: 1 }}>
+              <Wallet size={17} strokeWidth={1.9} />
+              <span className="tabular-nums" style={{ flex: 1 }}>
                 {t('balance')}: <strong>{formatRupiah(remaining)}</strong>
-                {remaining <= 0 && ` — ${t('budget_depleted_alert')}`}
+                {remaining <= 0 && ` — ${t('budget_depleted_alert').replace(/^⚠️\s*/, '')}`}
               </span>
             </div>
           )}
@@ -165,6 +192,35 @@ export default function NewTransactionPage() {
             <div className="alert alert-danger">
               <AlertCircle size={16} />
               <span>{errors.submit}</span>
+            </div>
+          )}
+
+          {/* 1-Tap Pintasan "Sering Dicatat" */}
+          {frequentTemplates.length > 0 && (
+            <div className="card" style={{ marginBottom: 18 }}>
+              <div className="card-body" style={{ padding: '14px 18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: '0.76rem', fontWeight: 650, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <Sparkles size={13} style={{ color: 'var(--color-primary-500)' }} />
+                  Sering Dicatat (Isi Cepat 1-Ketuk)
+                </div>
+                <div className="frequent-templates-wrap">
+                  {frequentTemplates.map((tpl) => {
+                    const catColor = CATEGORIES.find(c => c.id === tpl.category)?.color || '#0d9488'
+                    return (
+                      <button
+                        key={tpl.itemName}
+                        type="button"
+                        className="frequent-template-chip"
+                        onClick={() => applyFrequentTemplate(tpl)}
+                      >
+                        <CategoryIcon category={tpl.category} size={13} style={{ color: catColor }} />
+                        <span>{tpl.itemName}</span>
+                        <span className="frequent-template-amt">· {formatRupiah(tpl.amount)}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
@@ -276,7 +332,9 @@ export default function NewTransactionPage() {
                             if (errors.category) setErrors(prev => ({ ...prev, category: '' }))
                           }}
                         >
-                          <span className="category-grid-item-emoji">{c.emoji}</span>
+                          <span className="category-grid-item-icon" style={{ color: isActive ? 'var(--color-primary-500)' : c.color }}>
+                            <CategoryIcon category={c.id} size={18} strokeWidth={1.85} />
+                          </span>
                           <span className="category-grid-item-label">{t(c.labelKey)}</span>
                         </button>
                       )
@@ -325,12 +383,12 @@ export default function NewTransactionPage() {
                   disabled={loading}
                 >
                   {loading ? (
-                    <>
-                      <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      {t('loading')}
-                    </>
+                    <span className="btn-shimmer-dot" style={{ width: 72 }} />
                   ) : (
-                    `💾 ${t('save')} ${t('add_expense')}`
+                    <>
+                      <Save size={17} strokeWidth={1.9} />
+                      {t('save')} {t('add_expense')}
+                    </>
                   )}
                 </button>
               </form>
@@ -344,41 +402,41 @@ export default function NewTransactionPage() {
             <div className="modal">
               <div className="modal-header">
                 <h3 className="modal-title">Konfirmasi {t('add_expense')}</h3>
-                <button className="btn-icon" onClick={() => setShowConfirm(false)}>✕</button>
+                <button className="btn-icon" onClick={() => setShowConfirm(false)}><X size={16} /></button>
               </div>
               <div className="modal-body">
-                <p style={{ marginBottom: 16, color: 'var(--text-secondary)' }}>Pastikan rincian pengeluaran di bawah ini sudah benar:</p>
-                <div style={{ background: 'var(--bg-tertiary)', borderRadius: 8, padding: 16 }}>
+                <p style={{ marginBottom: 16, color: 'var(--text-secondary)', fontSize: '0.86rem' }}>Pastikan rincian pengeluaran di bawah ini sudah benar:</p>
+                <div style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 16 }}>
                   <div style={{ display: 'grid', gap: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>{t('item_name')}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>{t('item_name')}</span>
                       <span style={{ fontWeight: 600 }}>{form.itemName}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>{t('amount')}</span>
-                      <span style={{ fontWeight: 700, color: '#ef4444', fontSize: '1.1rem' }}>{formatRupiah(parseInt(form.amount))}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>{t('amount')}</span>
+                      <span className="tabular-nums" style={{ fontWeight: 700, color: 'var(--color-danger)', fontSize: '1.05rem' }}>{formatRupiah(parseInt(form.amount))}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>{t('category')}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>{t('category')}</span>
                       <span>{t(CATEGORIES.find(c => c.id === form.category)?.labelKey)}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>{t('date')}</span>
-                      <span>{form.transactionDate}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>{t('date')}</span>
+                      <span className="tabular-nums">{form.transactionDate}</span>
                     </div>
                   </div>
                 </div>
                 {willExceed && (
                   <div className="alert alert-warning" style={{ marginTop: 16 }}>
                     <AlertCircle size={16} />
-                    <span>{t('budget_depleted_alert')}</span>
+                    <span>{t('budget_depleted_alert').replace(/^⚠️\s*/, '')}</span>
                   </div>
                 )}
               </div>
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setShowConfirm(false)}>{t('cancel')}</button>
                 <button className="btn btn-primary" onClick={handleConfirm} id="confirm-submit">
-                  ✅ {t('save')}
+                  <Check size={15} /> {t('save')}
                 </button>
               </div>
             </div>

@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import AppShell from '@/components/AppShell'
 import { useLanguage } from '@/components/LanguageContext'
-import { formatRupiah, formatMonthYear } from '@/lib/format'
+import { formatRupiah, formatMonthYear, formatMemberName } from '@/lib/format'
 import { getCategoryInfo } from '@/lib/constants'
+import CategoryIcon from '@/components/CategoryIcon'
+import { CalendarSkeleton } from '@/components/Skeleton'
 import { cachedFetch, peekCache } from '@/lib/clientCache'
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info, ArrowDownLeft, User } from 'lucide-react'
 
 export default function CalendarPage() {
   const { t, language } = useLanguage()
@@ -154,46 +156,46 @@ export default function CalendarPage() {
   return (
     <AppShell>
       <div className="page-container fade-in">
-        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+        <div className="page-header" style={{ marginBottom: 20 }}>
           <div>
-            <h1>{t('calendar')} 📅</h1>
+            <h1>{t('calendar')}</h1>
             <p>{t('calendar_subtitle')}</p>
           </div>
           {/* Kontrol Bulan */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: 12, border: '1px solid var(--border-color)' }}>
-            <button className="btn-icon" onClick={handlePrevMonth} style={{ padding: 4 }}>
-              <ChevronLeft size={20} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-secondary)', padding: '5px 10px', borderRadius: 10, border: '1px solid var(--border-color)' }}>
+            <button className="btn-icon" onClick={handlePrevMonth} style={{ width: 30, height: 30 }}>
+              <ChevronLeft size={18} />
             </button>
-            <strong style={{ minWidth: 120, textAlign: 'center', fontSize: '0.95rem' }}>
+            <strong style={{ minWidth: 120, textAlign: 'center', fontSize: '0.9rem' }}>
               {formatMonthYear(month, year, language)}
             </strong>
-            <button className="btn-icon" onClick={handleNextMonth} style={{ padding: 4 }}>
-              <ChevronRight size={20} />
+            <button className="btn-icon" onClick={handleNextMonth} style={{ width: 30, height: 30 }}>
+              <ChevronRight size={18} />
             </button>
           </div>
         </div>
 
         {/* Legend Penjelasan Warna */}
-        <div className="card" style={{ marginBottom: 20, padding: '12px 20px' }}>
+        <div className="card" style={{ marginBottom: 20, padding: '12px 18px' }}>
           <div className="calendar-legend">
-            <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-primary)' }}>
               <Info size={14} style={{ color: 'var(--color-primary-500)' }} />
               {t('color_guide')}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 14, height: 14, borderRadius: 4, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', display: 'inline-block' }} /> {t('no_expense_day')}
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', display: 'inline-block' }} /> {t('no_expense_day')}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 14, height: 14, borderRadius: 4, background: 'linear-gradient(135deg, #a7f3d0 0%, #10b981 100%)', display: 'inline-block' }} /> {t('cal_low_desc')}
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: 'rgba(16, 185, 129, 0.35)', border: '1px solid rgba(16, 185, 129, 0.5)', display: 'inline-block' }} /> {t('cal_low_desc')}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 14, height: 14, borderRadius: 4, background: 'linear-gradient(135deg, #fef3c7 0%, #f59e0b 100%)', display: 'inline-block' }} /> {t('cal_med_desc')}
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: 'rgba(245, 158, 11, 0.35)', border: '1px solid rgba(245, 158, 11, 0.5)', display: 'inline-block' }} /> {t('cal_med_desc')}
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 14, height: 14, borderRadius: 4, background: 'linear-gradient(135deg, #fee2e2 0%, #ef4444 100%)', display: 'inline-block' }} /> {t('cal_high_desc')}
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: 'rgba(239, 68, 68, 0.35)', border: '1px solid rgba(239, 68, 68, 0.5)', display: 'inline-block' }} /> {t('cal_high_desc')}
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: '0.95rem' }}>💰</span> {t('has_income_day')}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <ArrowDownLeft size={13} style={{ color: 'var(--color-success)' }} /> {t('has_income_day')}
             </span>
           </div>
         </div>
@@ -208,10 +210,7 @@ export default function CalendarPage() {
             onTouchEnd={handleTouchEnd}
           >
             {loading ? (
-              <div className="loading-container" style={{ padding: '60px 0' }}>
-                <div className="spinner" />
-                <p>{t('loading')}</p>
-              </div>
+              <CalendarSkeleton />
             ) : (
               <div className={`calendar-grid-wrapper cal-slide-${slideDir || 'none'}`}>
                 {/* Header Hari */}
@@ -249,8 +248,15 @@ export default function CalendarPage() {
                             {day}
                           </span>
                           {hasIncome && (
-                            <span style={{ fontSize: '0.8rem', cursor: 'help' }} title={`Ada kas masuk: ${formatRupiah(stats.incomes)}`}>
-                              💰
+                            <span
+                              style={{
+                                width: 18, height: 18, borderRadius: 5,
+                                background: 'rgba(16, 185, 129, 0.16)', color: 'var(--color-success)',
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              }}
+                              title={`Ada kas masuk: ${formatRupiah(stats.incomes)}`}
+                            >
+                              <ArrowDownLeft size={11} strokeWidth={2.3} />
                             </span>
                           )}
                         </div>
@@ -324,10 +330,15 @@ export default function CalendarPage() {
                         >
                           <div>
                             <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{tx.itemName}</div>
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                              <span>{info.emoji} {t(info.labelKey)}</span>
-                              <span>•</span>
-                              <span>👤 {tx.member?.name || '-'}</span>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <CategoryIcon category={info.id} size={11} style={{ color: info.color }} />
+                                {t(info.labelKey)}
+                              </span>
+                              <span>·</span>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }} title={tx.member?.name || '-'}>
+                                <User size={11} /> {formatMemberName(tx.member?.name)}
+                              </span>
                             </div>
                             {tx.notes && (
                               <div style={{ fontSize: '0.7rem', fontStyle: 'italic', color: 'var(--text-muted)', marginTop: 2 }}>

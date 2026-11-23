@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { getAppToday } from '@/lib/cashbook'
 
 export async function GET(request) {
   try {
@@ -41,8 +42,9 @@ export async function GET(request) {
       ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
     }
 
-    const curMonth = month || (new Date().getMonth() + 1)
-    const curYear  = year  || new Date().getFullYear()
+    const appToday = getAppToday()
+    const curMonth = month || appToday.month
+    const curYear  = year  || appToday.year
     const periodWhere = {
       memberId: session.id,
       date: {
@@ -161,12 +163,19 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Nominal harus berupa bilangan bulat lebih dari 0' }, { status: 400 })
     }
 
+    // Cegah bentrok penamaan manual dengan item sistem "Tambah Saldo (Top-Up)"
+    const safeType = type === 'income' ? 'income' : 'expense'
+    const safeItemName =
+      safeType === 'income' && cleanItemName.toLowerCase() === 'tambah saldo (top-up)'
+        ? 'Tambah Saldo (Manual)'
+        : cleanItemName
+
     const item = await prisma.personalTransaction.create({
       data: {
         memberId: session.id,
-        itemName: cleanItemName,
+        itemName: safeItemName,
         amount:   BigInt(numericAmount),
-        type:     type === 'income' ? 'income' : 'expense',
+        type:     safeType,
         category: category,
         date:     txDate,
         notes:    typeof notes === 'string' && notes.trim() ? notes.trim() : null,

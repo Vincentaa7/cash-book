@@ -1,4 +1,4 @@
-// app/api/personal/[id]/route.js - Edit & Delete personal transaction (Atomic + Validated)
+// app/api/personal/[id]/route.js - Edit & Delete personal transaction (Atomic, Clamped >= 0, Cross-Month Safe)
 
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
@@ -34,14 +34,19 @@ export async function PUT(request, { params }) {
         return { error: 'Akses ditolak', status: 403 }
       }
 
-      const safeType = existing.itemName === 'Tambah Saldo (Top-Up)' && existing.type === 'income'
-        ? 'income'
-        : (type === 'income' ? 'income' : 'expense')
+      const isTopup = existing.itemName === 'Tambah Saldo (Top-Up)' && existing.type === 'income'
+      // Kunci tipe & nama item untuk transaksi Top-Up agar tidak pernah terhitung ganda
+      const safeType = isTopup ? 'income' : (type === 'income' ? 'income' : 'expense')
+      const safeItemName = isTopup
+        ? 'Tambah Saldo (Top-Up)'
+        : (safeType === 'income' && cleanItemName.toLowerCase() === 'tambah saldo (top-up)'
+            ? 'Tambah Saldo (Manual)'
+            : cleanItemName)
 
       const updated = await tx.personalTransaction.update({
         where: { id },
         data: {
-          itemName: cleanItemName,
+          itemName: safeItemName,
           amount:   BigInt(numericAmount),
           type:     safeType,
           category,
@@ -50,16 +55,47 @@ export async function PUT(request, { params }) {
         },
       })
 
-      // Jika transaksi adalah Top-Up Saldo Utama, sesuaikan juga personalBudget bulan terkait secara atomik
-      if (existing.itemName === 'Tambah Saldo (Top-Up)' && existing.type === 'income' && tx.personalBudget) {
+      // Jika transaksi adalah Top-Up Saldo Utama, sesuaikan personalBudget (termasuk jika pindah bulan & clamp >= 0)
+      if (isTopup && tx.personalBudget) {
         const oldDate = new Date(existing.date)
         const oldMonth = oldDate.getUTCMonth() + 1
         const oldYear = oldDate.getUTCFullYear()
-        const delta = BigInt(numericAmount) - BigInt(existing.amount)
-        if (delta !== 0n) {
-          await tx.personalBudget.updateMany({
-            where: { memberId: session.id, month: oldMonth, year: oldYear },
-            data: { amount: { increment: delta } },
+        const newMonth = txDate.getUTCMonth() + 1
+        const newYear = txDate.getUTCFullYear()
+        const oldAmt = Number(existing.amount)
+
+        if (oldMonth === newMonth && oldYear === newYear) {
+          const curBudget = await tx.personalBudget.findUnique({
+            where: { uq_personal_budget: { memberId: session.id, month: oldMonth, year: oldYear } },
+          })
+          if (curBudget) {
+            const nextVal = Math.max(0, Number(curBudget.amount) + (numericAmount - oldAmt))
+            await tx.personalBudget.update({
+              where: { id: curBudget.id },
+              data: { amount: BigInt(nextVal) },
+            })
+          }
+        } else {
+          // Pindah bulan: kurangi bulan lama (clamp >= 0) dan tambahkan ke bulan baru
+          const oldBudget = await tx.personalBudget.findUnique({
+            where: { uq_personal_budget: { memberId: session.id, month: oldMonth, year: oldYear } },
+          })
+          if (oldBudget) {
+            const nextOld = Math.max(0, Number(oldBudget.amount) - oldAmt)
+            await tx.personalBudget.update({
+              where: { id: oldBudget.id },
+              data: { amount: BigInt(nextOld) },
+            })
+          }
+          await tx.personalBudget.upsert({
+            where: { uq_personal_budget: { memberId: session.id, month: newMonth, year: newYear } },
+            update: { amount: { increment: BigInt(numericAmount) } },
+            create: {
+              memberId: session.id,
+              month: newMonth,
+              year: newYear,
+              amount: BigInt(numericAmount),
+            },
           })
         }
       }
@@ -103,15 +139,21 @@ export async function DELETE(request, { params }) {
         return { error: 'Sudah dihapus sebelumnya', status: 404 }
       }
 
-      // Jika transaksi yang dihapus adalah Top-Up Saldo Utama, kurangi juga personalBudget bulan terkait secara atomik
+      // Jika transaksi yang dihapus adalah Top-Up Saldo Utama, kurangi personalBudget secara atomik & clamp >= 0
       if (existing.itemName === 'Tambah Saldo (Top-Up)' && existing.type === 'income' && tx.personalBudget) {
         const oldDate = new Date(existing.date)
         const oldMonth = oldDate.getUTCMonth() + 1
         const oldYear = oldDate.getUTCFullYear()
-        await tx.personalBudget.updateMany({
-          where: { memberId: session.id, month: oldMonth, year: oldYear },
-          data: { amount: { decrement: BigInt(existing.amount) } },
+        const curBudget = await tx.personalBudget.findUnique({
+          where: { uq_personal_budget: { memberId: session.id, month: oldMonth, year: oldYear } },
         })
+        if (curBudget) {
+          const nextVal = Math.max(0, Number(curBudget.amount) - Number(existing.amount))
+          await tx.personalBudget.update({
+            where: { id: curBudget.id },
+            data: { amount: BigInt(nextVal) },
+          })
+        }
       }
 
       return { ok: true }

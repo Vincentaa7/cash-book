@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { getAppToday } from '@/lib/cashbook'
 
 export async function GET(request) {
   try {
@@ -12,8 +13,9 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const month = parseInt(searchParams.get('month')) || (new Date().getMonth() + 1)
-    const year  = parseInt(searchParams.get('year'))  || new Date().getFullYear()
+    const appToday = getAppToday()
+    const month = parseInt(searchParams.get('month'), 10) || appToday.month
+    const year  = parseInt(searchParams.get('year'), 10)  || appToday.year
 
     let budget = null
     if (prisma.personalBudget) {
@@ -69,9 +71,9 @@ export async function POST(request) {
     let resultAmount = numericAmount
 
     if (action === 'add') {
-      const now = new Date()
-      let txDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
-      if (now.getMonth() + 1 !== parsedMonth || now.getFullYear() !== parsedYear) {
+      const appToday = getAppToday()
+      let txDate = appToday.date
+      if (appToday.month !== parsedMonth || appToday.year !== parsedYear) {
         txDate = new Date(Date.UTC(parsedYear, parsedMonth - 1, 1))
       }
 
