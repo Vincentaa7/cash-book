@@ -136,10 +136,10 @@ export default function CalendarPage() {
 
   function formatCompact(val) {
     if (val >= 1000000) {
-      return (val / 1000000).toFixed(1).replace('.0', '') + 'jt'
+      return (val / 1000000).toFixed(1).replace('.0', '') + t('amt_unit_m')
     }
     if (val >= 1000) {
-      return (val / 1000).toFixed(0) + 'rb'
+      return (val / 1000).toFixed(0) + t('amt_unit_k')
     }
     return val.toString()
   }
@@ -254,7 +254,7 @@ export default function CalendarPage() {
                                 background: 'rgba(16, 185, 129, 0.16)', color: 'var(--color-success)',
                                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                               }}
-                              title={`Ada kas masuk: ${formatRupiah(stats.incomes)}`}
+                              title={t('has_income_tooltip').replace('{amount}', formatRupiah(stats.incomes))}
                             >
                               <ArrowDownLeft size={11} strokeWidth={2.3} />
                             </span>
@@ -296,7 +296,7 @@ export default function CalendarPage() {
                       </strong>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{t('total_expense').split(' ')[1] || t('total_expense')}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{t('expense_short')}</div>
                       <strong style={{ color: 'var(--color-danger)', fontSize: '0.95rem' }}>
                         {formatRupiah(selectedDayData?.expenses || 0)}
                       </strong>

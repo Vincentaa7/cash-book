@@ -312,10 +312,10 @@ export default function LaporanPage() {
       // Simpan PDF
       const fileName = `laporan-keuangan-${startDate}-${endDate}.pdf`
       doc.save(fileName)
-      toast.success('Laporan PDF berhasil dibuat & diunduh')
+      toast.success(t('pdf_export_success'))
     } catch (err) {
       console.error('PDF export error:', err)
-      toast.error('Gagal membuat PDF. Silakan coba lagi.')
+      toast.error(t('pdf_export_error'))
     }
   }
 
@@ -526,14 +526,14 @@ export default function LaporanPage() {
         <div className="page-header">
           <div>
             <h1>{t('reports')}</h1>
-            <p>Analisis realisasi anggaran, tren bulanan, dan ekspor laporan keuangan</p>
+            <p>{t('reports_subtitle')}</p>
           </div>
           <div className="page-header-actions">
             <button className="btn btn-ghost btn-sm" onClick={handleExport}>
-              <Download size={15} strokeWidth={1.85} /> Export CSV
+              <Download size={15} strokeWidth={1.85} /> {t('export_csv')}
             </button>
             <button className="btn btn-danger btn-sm" onClick={handleExportPDF}>
-              <FileText size={15} strokeWidth={1.85} /> Export PDF
+              <FileText size={15} strokeWidth={1.85} /> {t('export_pdf')}
             </button>
             <button className="btn btn-ghost btn-sm" onClick={handlePrint}>
               <Printer size={15} strokeWidth={1.85} /> {t('print_report')}
@@ -549,7 +549,7 @@ export default function LaporanPage() {
           <div className="card-body">
             <div className="filter-bar" style={{ border: 'none', background: 'transparent', padding: 0 }}>
               <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                <label className="form-label" style={{ fontSize: '0.8rem' }}>Dari {t('date')}</label>
+                <label className="form-label" style={{ fontSize: '0.8rem' }}>{t('from_date')}</label>
                 <input
                   type="date"
                   className="form-input"
@@ -558,7 +558,7 @@ export default function LaporanPage() {
                 />
               </div>
               <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                <label className="form-label" style={{ fontSize: '0.8rem' }}>Sampai {t('date')}</label>
+                <label className="form-label" style={{ fontSize: '0.8rem' }}>{t('to_date')}</label>
                 <input
                   type="date"
                   className="form-input"
@@ -593,7 +593,7 @@ export default function LaporanPage() {
 
             {/* Preset buttons */}
             <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', alignSelf: 'center' }}>Preset:</span>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', alignSelf: 'center' }}>{t('preset_label')}</span>
               {[
                 { id: '7days', label: t('d_7days') },
                 { id: '30days', label: t('d_30days') },
@@ -614,20 +614,20 @@ export default function LaporanPage() {
             <div className="card-header">
               <h3 className="card-title">
                 <BarChart3 size={16} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
-                {t('budget_vs_realization')} ({formatMonthYear(selectedMonth, selectedYear, language)}{!isSameMonth ? ' · Bulan Berjalan' : ''})
+                {t('budget_vs_realization')} ({formatMonthYear(selectedMonth, selectedYear, language)}{!isSameMonth ? ` · ${t('current_month_badge')}` : ''})
               </h3>
             </div>
             <div className="card-body">
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: '0.88rem', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <span style={{ color: 'var(--text-muted)' }}>
-                    {isSameMonth ? `${t('total_budget')}:` : `Total Kas (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
+                    {isSameMonth ? `${t('total_budget')}:` : `${t('total_cash_short')} (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
                   </span>{' '}
                   <strong className="tabular-nums" style={{ fontSize: '1.02rem' }}>{formatRupiah(dashboardSummary.totalBudget)}</strong>
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-muted)' }}>
-                    {isSameMonth ? `${t('total_expense')}:` : `Pengeluaran (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
+                    {isSameMonth ? `${t('total_expense')}:` : `${t('expense_short')} (${formatMonthYear(selectedMonth, selectedYear, language)}):`}
                   </span>{' '}
                   <strong className="tabular-nums" style={{ fontSize: '1.02rem', color: 'var(--color-danger)' }}>{formatRupiah(dashboardSummary.totalExpense)}</strong>
                 </div>
@@ -652,8 +652,8 @@ export default function LaporanPage() {
                       />
                     </div>
                     <div className="tabular-nums" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      <span>{pct}% Terpakai</span>
-                      <span>{pct > 100 ? 'Melebihi Anggaran' : `${100 - pct}% Tersisa`}</span>
+                      <span>{t('pct_used').replace('{pct}', pct)}</span>
+                      <span>{pct > 100 ? t('over_budget') : t('pct_left').replace('{pct}', 100 - pct)}</span>
                     </div>
                   </div>
                 )
@@ -671,11 +671,11 @@ export default function LaporanPage() {
               {/* Card 1: Total Transaksi */}
               <div className="summary-card card-history">
                 <div className="summary-card-head">
-                  <span className="summary-card-label">Jumlah Transaksi</span>
+                  <span className="summary-card-label">{t('tx_count_label')}</span>
                   <div className="summary-card-icon"><ReceiptText size={16} strokeWidth={1.85} /></div>
                 </div>
                 <div className="summary-card-value">{data?.total !== undefined ? data.total : transactions.length}</div>
-                <div className="summary-card-sub tabular-nums">{startDate} s/d {endDate}</div>
+                <div className="summary-card-sub tabular-nums">{startDate} {t('date_to')} {endDate}</div>
               </div>
 
               {/* Card 2: Total Pengeluaran */}
@@ -685,7 +685,7 @@ export default function LaporanPage() {
                   <div className="summary-card-icon"><ArrowUpRight size={16} strokeWidth={1.85} /></div>
                 </div>
                 <div className="summary-card-value" style={{ color: 'var(--color-danger)' }}>{formatRupiah(totalExpense)}</div>
-                <div className="summary-card-sub">Periode filter aktif</div>
+                <div className="summary-card-sub">{t('active_filter_period')}</div>
               </div>
 
               {/* Card 3: Rata-rata per Transaksi */}
@@ -695,7 +695,7 @@ export default function LaporanPage() {
                   <div className="summary-card-icon"><Calculator size={16} strokeWidth={1.85} /></div>
                 </div>
                 <div className="summary-card-value">{formatRupiah(avgTxAmount)}</div>
-                <div className="summary-card-sub">Per transaksi dicatat</div>
+                <div className="summary-card-sub">{t('per_recorded_tx')}</div>
               </div>
 
               {/* Card 4: Hari Terboros */}
@@ -705,7 +705,7 @@ export default function LaporanPage() {
                   <div className="summary-card-icon"><CalendarDays size={16} strokeWidth={1.85} /></div>
                 </div>
                 <div className="summary-card-value">{peakDayName}</div>
-                <div className="summary-card-sub tabular-nums">{maxDayExpense > 0 ? `Total: ${formatRupiah(maxDayExpense)}` : 'Belum ada data'}</div>
+                <div className="summary-card-sub tabular-nums">{maxDayExpense > 0 ? `${t('total')}: ${formatRupiah(maxDayExpense)}` : t('no_data_yet')}</div>
               </div>
 
               {/* Card 5: Kategori Terboros */}
@@ -727,7 +727,7 @@ export default function LaporanPage() {
                     <div className="summary-card-icon"><Tag size={16} strokeWidth={1.85} /></div>
                   </div>
                   <div className="summary-card-value">-</div>
-                  <div className="summary-card-sub">Belum ada data</div>
+                  <div className="summary-card-sub">{t('no_data_yet')}</div>
                 </div>
               )}
 
@@ -735,7 +735,7 @@ export default function LaporanPage() {
               {memberBreakdown[0] ? (
                 <div className="summary-card card-peak-member">
                   <div className="summary-card-head">
-                    <span className="summary-card-label">{t('highest_expense')} (Anggota)</span>
+                    <span className="summary-card-label">{t('highest_expense')} ({t('member_short')})</span>
                     <div className="summary-card-icon"><User size={16} strokeWidth={1.85} /></div>
                   </div>
                   <div className="summary-card-value truncate" style={{ fontSize: '1.1rem' }} title={memberBreakdown[0].name}>{formatMemberName(memberBreakdown[0].name)}</div>
@@ -744,11 +744,11 @@ export default function LaporanPage() {
               ) : (
                 <div className="summary-card card-peak-member">
                   <div className="summary-card-head">
-                    <span className="summary-card-label">{t('highest_expense')} (Anggota)</span>
+                    <span className="summary-card-label">{t('highest_expense')} ({t('member_short')})</span>
                     <div className="summary-card-icon"><User size={16} strokeWidth={1.85} /></div>
                   </div>
                   <div className="summary-card-value">-</div>
-                  <div className="summary-card-sub">Belum ada data</div>
+                  <div className="summary-card-sub">{t('no_data_yet')}</div>
                 </div>
               )}
             </div>
@@ -759,7 +759,7 @@ export default function LaporanPage() {
                 <div className="card-header">
                   <h3 className="card-title">
                     <Tag size={15} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
-                    Rincian {t('category')}
+                    {t('category_breakdown')}
                   </h3>
                 </div>
                 <div className="card-body">
@@ -801,7 +801,7 @@ export default function LaporanPage() {
                 <div className="card-header">
                   <h3 className="card-title">
                     <PieChartIcon size={15} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
-                    Statistik {t('category')}
+                    {t('category_statistics')}
                   </h3>
                 </div>
                 <div className="card-body">
@@ -850,7 +850,7 @@ export default function LaporanPage() {
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: 8 }}>
                   <h3 className="card-title">
                     <BarChart3 size={16} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
-                    Tren 6 Bulan Terakhir
+                    {t('last_6_months_trend')}
                   </h3>
                   {/* Summary naik/turun */}
                   {compareData.previous?.amount > 0 && (
@@ -870,9 +870,9 @@ export default function LaporanPage() {
                         : compareData.changeTrend === 'down'
                         ? <TrendingDown size={14} />
                         : <Minus size={14} />}
-                      {Math.abs(compareData.changePercent)}%
-                      {compareData.changeTrend === 'up' ? ' lebih boros' : compareData.changeTrend === 'down' ? ' lebih hemat' : ' sama'}
-                      {' '}vs bulan lalu
+                      {Math.abs(compareData.changePercent)}%{' '}
+                      {compareData.changeTrend === 'up' ? t('trend_more') : compareData.changeTrend === 'down' ? t('trend_less') : t('trend_same')}
+                      {' '}{t('vs_last_month')}
                     </div>
                   )}
                 </div>
@@ -880,23 +880,23 @@ export default function LaporanPage() {
                   {/* Summary cards: bulan ini vs bulan lalu vs rata-rata */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
                     <div className="metric-tile" style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, border: '1px solid var(--border-color)', borderLeft: '4px solid var(--color-primary-500)' }}>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Bulan Ini</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>{t('compare_current')}</div>
                       <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--color-primary-600)', whiteSpace: 'nowrap' }}>{formatRupiah(compareData.current?.amount || 0)}</div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                         {formatMonthYear(compareData.current?.month, compareData.current?.year, language)}
                       </div>
                     </div>
                     <div className="metric-tile" style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, border: '1px solid var(--border-color)', borderLeft: '4px solid #64748b' }}>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Bulan Lalu</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>{t('compare_prev')}</div>
                       <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '0.98rem', color: '#64748b', whiteSpace: 'nowrap' }}>{formatRupiah(compareData.previous?.amount || 0)}</div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                         {formatMonthYear(compareData.previous?.month, compareData.previous?.year, language)}
                       </div>
                     </div>
                     <div className="metric-tile" style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, border: '1px solid var(--border-color)', borderLeft: '4px solid #f59e0b' }}>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Rata-rata 3 Bln</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>{t('compare_avg')}</div>
                       <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '0.98rem', color: '#d97706', whiteSpace: 'nowrap' }}>{formatRupiah(compareData.avg3Months || 0)}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>per bulan</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{t('per_month')}</div>
                     </div>
                   </div>
 
@@ -929,15 +929,15 @@ export default function LaporanPage() {
                   <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 8, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--color-primary-500)', display: 'inline-block' }} />
-                      Bulan ini
+                      {t('compare_current')}
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <span style={{ width: 10, height: 10, borderRadius: 2, background: '#94a3b8', display: 'inline-block' }} />
-                      Bulan lalu
+                      {t('compare_prev')}
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <span style={{ width: 10, height: 10, borderRadius: 2, background: '#cbd5e1', display: 'inline-block' }} />
-                      Sebelumnya
+                      {t('earlier_label')}
                     </span>
                   </div>
                 </div>
@@ -949,14 +949,14 @@ export default function LaporanPage() {
               <div className="card-header">
                 <h3 className="card-title">{t('history')} ({data?.total !== undefined ? data.total : transactions.length})</h3>
                 <span style={{ fontWeight: 700, color: '#ef4444' }}>
-                  Total: {formatRupiah(totalExpense)}
+                  {t('total')}: {formatRupiah(totalExpense)}
                 </span>
               </div>
               {transactions.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-state-icon"><Inbox size={22} /></div>
                   <h3>{t('no_transactions')}</h3>
-                  <p>Tidak ada transaksi pada rentang filter yang dipilih.</p>
+                  <p>{t('no_transactions_filter')}</p>
                 </div>
               ) : (
                 <>

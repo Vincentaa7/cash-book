@@ -3,6 +3,7 @@
 
 import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import { CheckCircle2, AlertCircle, Info, X, AlertTriangle, Check } from 'lucide-react'
+import { useLanguage } from '@/components/LanguageContext'
 
 const ToastContext = createContext(null)
 
@@ -15,6 +16,7 @@ export function useToast() {
 }
 
 export function ToastProvider({ children }) {
+  const { t } = useLanguage()
   const [toasts, setToasts] = useState([])
   const [confirmState, setConfirmState] = useState(null)
   const confirmResolverRef = useRef(null)
@@ -39,17 +41,23 @@ export function ToastProvider({ children }) {
   }
 
   const confirmDialog = useCallback(({
-    title = 'Konfirmasi',
-    message = 'Apakah Anda yakin ingin melanjutkan?',
-    confirmText = 'Ya, Lanjutkan',
-    cancelText = 'Batal',
+    title,
+    message,
+    confirmText,
+    cancelText,
     variant = 'primary',
   } = {}) => {
     return new Promise((resolve) => {
       confirmResolverRef.current = resolve
-      setConfirmState({ title, message, confirmText, cancelText, variant })
+      setConfirmState({
+        title: title || t('confirm_default_title'),
+        message: message || t('confirm_default_msg'),
+        confirmText: confirmText || t('confirm_default_ok'),
+        cancelText: cancelText || t('cancel'),
+        variant,
+      })
     })
-  }, [])
+  }, [t])
 
   const handleConfirmResult = (result) => {
     setConfirmState(null)
@@ -78,7 +86,7 @@ export function ToastProvider({ children }) {
                 type="button"
                 className="toast-close"
                 onClick={() => removeToast(item.id)}
-                aria-label="Tutup notifikasi"
+                aria-label={t('close_notification')}
               >
                 <X size={14} />
               </button>

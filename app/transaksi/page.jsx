@@ -160,7 +160,7 @@ export default function TransaksiPage() {
   async function handleEditSave() {
     const parsedAmt = parseInt(editForm.amount, 10)
     if (!editForm.itemName?.trim() || !Number.isSafeInteger(parsedAmt) || parsedAmt <= 0 || !editForm.transactionDate) {
-      toast.error('Pastikan nama item, tanggal, dan nominal (> 0) terisi dengan benar.')
+      toast.error(t('tx_invalid_input'))
       return
     }
     setEditLoading(true)
@@ -176,13 +176,13 @@ export default function TransaksiPage() {
         setTransactions(prev => prev.map(item => item.id === updatedTx.id ? updatedTx : item))
         invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
         fetchTransactions(true)
-        toast.success('Perubahan transaksi berhasil disimpan')
+        toast.success(t('tx_edit_success'))
       } else {
         const err = await res.json().catch(() => ({}))
-        toast.error(err.error || 'Gagal menyimpan perubahan transaksi.')
+        toast.error(err.error || t('tx_edit_error'))
       }
     } catch {
-      toast.error('Gagal terhubung ke server.')
+      toast.error(t('connection_error'))
     }
     setEditLoading(false)
   }
@@ -204,13 +204,13 @@ export default function TransaksiPage() {
         }
         invalidateCache(['/api/dashboard', '/api/transactions', '/api/laporan', '/api/budget'])
         fetchTransactions(true)
-        toast.success('Transaksi berhasil dihapus')
+        toast.success(t('tx_delete_success'))
       } else {
         const err = await res.json().catch(() => ({}))
-        toast.error(err.error || 'Gagal menghapus transaksi.')
+        toast.error(err.error || t('tx_delete_error'))
       }
     } catch {
-      toast.error('Gagal terhubung ke server.')
+      toast.error(t('connection_error'))
     }
     setDeleteLoading(false)
   }
@@ -221,11 +221,11 @@ export default function TransaksiPage() {
         <div className="page-header">
           <div>
             <h1>{t('history')}</h1>
-            <p>Kelola, filter, dan audit seluruh catatan transaksi kas keluarga</p>
+            <p>{t('history_subtitle')}</p>
           </div>
           <div className="page-header-actions">
             <button className="btn btn-ghost btn-sm" onClick={handleExport}>
-              <Download size={15} strokeWidth={1.85} /> Export CSV
+              <Download size={15} strokeWidth={1.85} /> {t('export_csv')}
             </button>
             <Link href="/transaksi/baru" className="btn btn-primary btn-sm">
               <Plus size={15} strokeWidth={2.2} /> {t('add_expense')}
@@ -283,7 +283,7 @@ export default function TransaksiPage() {
                   onChange={e => setStartDate(e.target.value)}
                   style={{ flex: 1, minWidth: 0 }}
                 />
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>s/d</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t('date_to')}</span>
                 <input
                   type="date"
                   className="form-input"
@@ -333,7 +333,7 @@ export default function TransaksiPage() {
                       </span>
                       {totalIncome > 0 && !category && (
                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#10b981' }}>
-                          (Pemasukan: {formatRupiah(totalIncome)})
+                          ({t('income_label')}: {formatRupiah(totalIncome)})
                         </span>
                       )}
                     </>
@@ -350,7 +350,7 @@ export default function TransaksiPage() {
             <div className="empty-state">
               <div className="empty-state-icon"><Inbox size={22} /></div>
               <h3>{t('no_transactions')}</h3>
-              <p>Ubah filter pencarian atau tambahkan catatan pengeluaran baru.</p>
+              <p>{t('history_empty_sub')}</p>
             </div>
           ) : (
             <>
@@ -432,7 +432,7 @@ export default function TransaksiPage() {
                                 <button
                                   className="btn-icon"
                                   onClick={() => openEdit(tx)}
-                                  title="Edit"
+                                  title={t('edit')}
                                   style={{ flexShrink: 0, minWidth: 28, minHeight: 28 }}
                                 >
                                   <Edit2 size={14} />
@@ -442,7 +442,7 @@ export default function TransaksiPage() {
                                 <button
                                   className="btn-icon"
                                   onClick={() => setDeleteTx(tx)}
-                                  title="Hapus"
+                                  title={t('delete')}
                                   style={{ color: '#ef4444', flexShrink: 0, minWidth: 28, minHeight: 28 }}
                                 >
                                   <Trash2 size={14} />
@@ -460,7 +460,7 @@ export default function TransaksiPage() {
               {/* Mobile Fintech Ledger List (Zero Clipped Text & Zero Wrapped Numbers) */}
               <div className="mobile-ledger-only">
                 <div className="tx-mobile-sortbar">
-                  <span>Urutkan:</span>
+                  <span>{t('sort_by')}</span>
                   <div className="tx-mobile-sort-actions">
                     <button
                       type="button"
@@ -515,7 +515,7 @@ export default function TransaksiPage() {
                                   type="button"
                                   className="btn-icon"
                                   onClick={() => openEdit(tx)}
-                                  title="Edit"
+                                  title={t('edit')}
                                   style={{ width: 30, height: 30 }}
                                 >
                                   <Edit2 size={14} />
@@ -526,7 +526,7 @@ export default function TransaksiPage() {
                                   type="button"
                                   className="btn-icon"
                                   onClick={() => setDeleteTx(tx)}
-                                  title="Hapus"
+                                  title={t('delete')}
                                   style={{ color: 'var(--color-danger)', width: 30, height: 30 }}
                                 >
                                   <Trash2 size={14} />

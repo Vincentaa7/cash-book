@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useLanguage } from '@/components/LanguageContext'
 
 export default function PwaRegister() {
+  const { t } = useLanguage()
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [showInstallBanner, setShowInstallBanner] = useState(false)
   const [isStandalone, setIsStandalone] = useState(false)
@@ -76,15 +78,15 @@ export default function PwaRegister() {
           <img src="/icon-192.png" alt="Cash Book" width={38} height={38} style={{ borderRadius: 10 }} />
         </div>
         <div className="pwa-install-text">
-          <div className="pwa-install-title">Install Aplikasi Cash Book</div>
-          <div className="pwa-install-sub">Akses lebih cepat & praktis dari layar utama ponsel Anda</div>
+          <div className="pwa-install-title">{t('pwa_install_title')}</div>
+          <div className="pwa-install-sub">{t('pwa_install_sub')}</div>
         </div>
       </div>
       <div className="pwa-install-actions">
         <button className="pwa-btn-install" onClick={handleInstallClick}>
-          Install
+          {t('pwa_install_btn')}
         </button>
-        <button className="pwa-btn-dismiss" onClick={handleDismiss} aria-label="Tutup">
+        <button className="pwa-btn-dismiss" onClick={handleDismiss} aria-label={t('close_label')}>
           ✕
         </button>
       </div>

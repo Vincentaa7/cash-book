@@ -92,7 +92,7 @@ export default function DailyReminderSetup({ familyName = 'Cash Book' }) {
       setEnabled(false)
       localStorage.setItem(STORAGE_KEY_ENABLED, 'false')
       sendSwMessage({ type: 'CANCEL_REMINDER' })
-      showStatus('success', `${t('reminder_title')} dinonaktifkan.`)
+      showStatus('success', t('reminder_disabled').replace('{title}', t('reminder_title')))
     }
   }
 
@@ -125,7 +125,7 @@ export default function DailyReminderSetup({ familyName = 'Cash Book' }) {
     }
 
     sendSwMessage({ type: 'TEST_NOTIFICATION', payload: { familyName } })
-    showStatus('success', 'Notifikasi percobaan dikirim!')
+    showStatus('success', t('reminder_test_sent'))
   }
 
   function showStatus(type, text) {
@@ -154,7 +154,7 @@ export default function DailyReminderSetup({ familyName = 'Cash Book' }) {
       {permissionStatus === 'granted' && enabled && (
         <div className="alert alert-success">
           <CheckCircle size={16} />
-          <span>{t('reminder_permission_granted')} — Pengingat aktif pukul <strong>{time}</strong></span>
+          <span>{t('reminder_permission_granted')} — {t('reminder_active_at').replace('{time}', time)}</span>
         </div>
       )}
 

@@ -119,9 +119,9 @@ function PengaturanContent() {
   async function handleCleanup() {
     if (!dbPreview || dbPreview.eligible === 0) return
     const ok = await confirmDialog({
-      title: 'Arsipkan & Hapus Transaksi Lama',
+      title: t('db_archive_modal_title'),
       message: t('db_confirm').replace('{count}', dbPreview.eligible),
-      confirmText: `Arsipkan ${dbPreview.eligible} Transaksi`,
+      confirmText: t('db_archive_confirm_btn').replace('{count}', dbPreview.eligible),
       cancelText: t('cancel'),
       variant: 'danger',
     })
@@ -205,7 +205,7 @@ function PengaturanContent() {
     }
 
     const ok = await confirmDialog({
-      title: 'Konfirmasi Kas Bulanan',
+      title: t('budget_confirm_title'),
       message: t('confirm_budget_msg'),
       confirmText: t('save'),
       cancelText: t('cancel'),
@@ -392,9 +392,9 @@ function PengaturanContent() {
     }
 
     const ok = await confirmDialog({
-      title: currentStatus ? 'Nonaktifkan Anggota' : 'Aktifkan Anggota',
-      message: `Yakin ingin ${currentStatus ? 'menonaktifkan' : 'mengaktifkan'} anggota ini?`,
-      confirmText: currentStatus ? 'Nonaktifkan' : 'Aktifkan',
+      title: currentStatus ? t('member_deactivate_title') : t('member_activate_title'),
+      message: currentStatus ? t('member_deactivate_msg') : t('member_activate_msg'),
+      confirmText: currentStatus ? t('member_deactivate_btn') : t('member_activate_btn'),
       cancelText: t('cancel'),
       variant: currentStatus ? 'danger' : 'primary',
     })
@@ -717,14 +717,14 @@ function PengaturanContent() {
                               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                                 {/* Admin/Superadmin dapat edit anggota non-superadmin, dan setiap user (termasuk member) dapat edit profilnya sendiri */}
                                 {((isAdminOrSuper && m.role !== 'superadmin') || m.id === user.id) && (
-                                  <button className="btn-icon" onClick={() => openEditMember(m)} title="Edit"><Edit2 size={16}/></button>
+                                  <button className="btn-icon" onClick={() => openEditMember(m)} title={t('edit')}><Edit2 size={16}/></button>
                                 )}
                                 {isAdminOrSuper && m.role !== 'superadmin' && (
                                   <button 
                                     className="btn-icon" 
                                     onClick={() => handleToggleMemberActive(m.id, m.isActive)}
                                     disabled={m.id === user.id}
-                                    title={m.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                                    title={m.isActive ? t('member_deactivate_btn') : t('member_activate_btn')}
                                     style={{ color: m.isActive ? 'var(--color-danger)' : 'var(--color-success)' }}
                                   >
                                     {m.isActive ? <Trash2 size={16}/> : <Check size={16}/>}
@@ -732,7 +732,7 @@ function PengaturanContent() {
                                 )}
                                 {m.role === 'superadmin' && m.id !== user.id && (
                                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0 4px' }}>
-                                    <Lock size={12} /> Terlindungi
+                                    <Lock size={12} /> {t('protected_label')}
                                   </span>
                                 )}
                               </div>
@@ -999,7 +999,7 @@ function PengaturanContent() {
                                       whiteSpace: 'nowrap',
                                       minWidth: 0,
                                       flex: 1
-                                    }} title={log.member?.name || 'Sistem'}>{log.member?.name ? formatMemberName(log.member.name) : 'Sistem'}</span>
+                                    }} title={log.member?.name || t('system_actor')}>{log.member?.name ? formatMemberName(log.member.name) : t('system_actor')}</span>
                                   </div>
                                 </td>
                                 <td>
@@ -1026,8 +1026,8 @@ function PengaturanContent() {
                                 >
                                   {log.member?.name?.substring(0, 2).toUpperCase() || 'S'}
                                 </div>
-                                <span className="activity-log-actor-name" title={log.member?.name || 'Sistem'}>
-                                  {log.member?.name ? formatMemberName(log.member.name) : 'Sistem'}
+                                <span className="activity-log-actor-name" title={log.member?.name || t('system_actor')}>
+                                  {log.member?.name ? formatMemberName(log.member.name) : t('system_actor')}
                                 </span>
                               </div>
                               <div className="activity-log-card-time">
@@ -1045,7 +1045,10 @@ function PengaturanContent() {
                       {logsTotalPages > 1 && (
                         <div className="pagination activity-log-pagination" style={{ marginTop: 20 }}>
                           <span className="pagination-info">
-                            Hal {logsPage} / {logsTotalPages} ({logsTotal} log)
+                            {t('log_page_info')
+                              .replace('{page}', logsPage)
+                              .replace('{totalPages}', logsTotalPages)
+                              .replace('{total}', logsTotal)}
                           </span>
                           <div className="pagination-controls">
                             <button
@@ -1140,7 +1143,7 @@ function PengaturanContent() {
                     className="form-input"
                     value={memberForm.name}
                     onChange={e => setMemberForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="Masukkan nama anggota / username unik"
+                    placeholder={t('member_name_placeholder')}
                     required
                   />
                 </div>
@@ -1151,7 +1154,7 @@ function PengaturanContent() {
                     className="form-input"
                     value={memberForm.pin}
                     onChange={e => setMemberForm(f => ({ ...f, pin: e.target.value }))}
-                    placeholder={editMember ? 'Kosongkan jika tidak diubah' : 'Masukkan password'}
+                    placeholder={editMember ? t('member_pin_edit_placeholder') : t('member_pin_new_placeholder')}
                     required={!editMember}
                   />
                 </div>
@@ -1172,7 +1175,7 @@ function PengaturanContent() {
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Warna Avatar</label>
+                    <label className="form-label">{t('avatar_color_label')}</label>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                       {AVATAR_COLORS.map(color => (
                         <div

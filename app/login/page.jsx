@@ -741,7 +741,7 @@ export default function LoginPage() {
                     }}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer shrink-0 hover:brightness-110"
                   >
-                    Pakai OTP
+                    {t('auth_use_otp')}
                   </button>
                 </div>
               )}

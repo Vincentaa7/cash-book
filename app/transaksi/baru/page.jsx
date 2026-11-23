@@ -73,7 +73,7 @@ export default function NewTransactionPage() {
       amount: String(tpl.amount),
     }))
     setErrors({})
-    toast.info(`Template "${tpl.itemName}" diterapkan`)
+    toast.info(t('frequent_template_applied').replace('{name}', tpl.itemName))
   }
 
   function handleAmountChange(e) {
@@ -151,7 +151,7 @@ export default function NewTransactionPage() {
               <CheckCircle2 size={32} strokeWidth={1.9} />
             </div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>{t('add_expense')} — {t('success')}</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>Catatan pengeluaran berhasil disimpan ke buku kas.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>{t('add_expense_success_sub')}</p>
           </div>
         </div>
       </AppShell>
@@ -168,7 +168,7 @@ export default function NewTransactionPage() {
             </Link>
             <div>
               <h1>{t('add_expense')}</h1>
-              <p>Catat pengeluaran baru ke buku kas keluarga</p>
+              <p>{t('add_expense_subtitle')}</p>
             </div>
           </div>
         </div>
@@ -201,7 +201,7 @@ export default function NewTransactionPage() {
               <div className="card-body" style={{ padding: '14px 18px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: '0.76rem', fontWeight: 650, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   <Sparkles size={13} style={{ color: 'var(--color-primary-500)' }} />
-                  Sering Dicatat (Isi Cepat 1-Ketuk)
+                  {t('frequent_templates_title')}
                 </div>
                 <div className="frequent-templates-wrap">
                   {frequentTemplates.map((tpl) => {
@@ -236,7 +236,7 @@ export default function NewTransactionPage() {
                     id="tx-item"
                     type="text"
                     className={`form-input ${errors.itemName ? 'error' : ''}`}
-                    placeholder={t('search_placeholder')}
+                    placeholder={t('item_placeholder')}
                     value={form.itemName}
                     onChange={e => {
                       setForm(prev => ({ ...prev, itemName: e.target.value }))
@@ -272,15 +272,15 @@ export default function NewTransactionPage() {
                   {/* Pintasan Tambah Nominal Cepat */}
                   <div className="quick-amount-row">
                     {[
-                      { val: 10000, label: '+10rb' },
-                      { val: 20000, label: '+20rb' },
-                      { val: 50000, label: '+50rb' },
-                      { val: 100000, label: '+100rb' },
-                      { val: 250000, label: '+250rb' },
-                      { val: 500000, label: '+500rb' },
+                      { val: 10000, label: `+10${t('amt_unit_k')}` },
+                      { val: 20000, label: `+20${t('amt_unit_k')}` },
+                      { val: 50000, label: `+50${t('amt_unit_k')}` },
+                      { val: 100000, label: `+100${t('amt_unit_k')}` },
+                      { val: 250000, label: `+250${t('amt_unit_k')}` },
+                      { val: 500000, label: `+500${t('amt_unit_k')}` },
                     ].map(btn => (
                       <button
-                        key={btn.label}
+                        key={btn.val}
                         type="button"
                         className="quick-amount-btn"
                         onClick={() => {
@@ -299,7 +299,7 @@ export default function NewTransactionPage() {
                         className="quick-amount-btn reset-btn"
                         onClick={() => setForm(prev => ({ ...prev, amount: '' }))}
                       >
-                        Reset
+                        {t('reset_label')}
                       </button>
                     )}
                   </div>
@@ -308,7 +308,9 @@ export default function NewTransactionPage() {
                   {willExceed && (
                     <div className="form-error" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <AlertCircle size={13} />
-                      Nominal melebihi {t('balance').toLowerCase()} ({formatRupiah(remaining)})!
+                      {t('amount_exceeds_balance')
+                        .replace('{label}', t('balance').toLowerCase())
+                        .replace('{amount}', formatRupiah(remaining))}
                     </div>
                   )}
                 </div>
@@ -365,12 +367,12 @@ export default function NewTransactionPage() {
                 {/* Catatan */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="tx-notes">
-                    {t('notes')} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opsional)</span>
+                    {t('notes')} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{t('optional_label')}</span>
                   </label>
                   <textarea
                     id="tx-notes"
                     className="form-textarea"
-                    placeholder={t('search_placeholder')}
+                    placeholder={t('notes_placeholder')}
                     value={form.notes}
                     onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
                     rows={3}
@@ -401,11 +403,11 @@ export default function NewTransactionPage() {
           <div className="modal-overlay">
             <div className="modal">
               <div className="modal-header">
-                <h3 className="modal-title">Konfirmasi {t('add_expense')}</h3>
+                <h3 className="modal-title">{t('confirm_add_expense_title')}</h3>
                 <button className="btn-icon" onClick={() => setShowConfirm(false)}><X size={16} /></button>
               </div>
               <div className="modal-body">
-                <p style={{ marginBottom: 16, color: 'var(--text-secondary)', fontSize: '0.86rem' }}>Pastikan rincian pengeluaran di bawah ini sudah benar:</p>
+                <p style={{ marginBottom: 16, color: 'var(--text-secondary)', fontSize: '0.86rem' }}>{t('confirm_add_expense_desc')}</p>
                 <div style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: 10, padding: 16 }}>
                   <div style={{ display: 'grid', gap: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>

@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import AppShell from '@/components/AppShell'
 import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
-import { formatRupiah, formatNumber, formatDate, formatDateShort, formatDateInput } from '@/lib/format'
+import { formatRupiah, formatNumber, formatDate, formatDateShort, formatDateInput, getMonthName } from '@/lib/format'
 import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
 import CategoryIcon from '@/components/CategoryIcon'
 import { TableSkeleton } from '@/components/Skeleton'
@@ -17,22 +17,17 @@ import {
 } from 'lucide-react'
 
 const PERSONAL_CATEGORIES = [
-  { id: 'makanan',      emoji: '🍔', label: 'Makan & Minum' },
-  { id: 'transport',    emoji: '🚗', label: 'Transport' },
-  { id: 'belanja',      emoji: '🛍️', label: 'Belanja' },
-  { id: 'hiburan',      emoji: '🎮', label: 'Hiburan' },
-  { id: 'kesehatan',    emoji: '💊', label: 'Kesehatan' },
-  { id: 'pendidikan',   emoji: '📚', label: 'Pendidikan' },
-  { id: 'tabungan',     emoji: '🏦', label: 'Tabungan' },
-  { id: 'gaji',         emoji: '💰', label: 'Gaji / Pemasukan' },
-  { id: 'investasi',    emoji: '📈', label: 'Investasi' },
-  { id: 'utilitas',     emoji: '💡', label: 'Tagihan / Utilitas' },
-  { id: 'lainnya_prb',  emoji: '📦', label: 'Lainnya' },
-]
-
-const MONTH_NAMES = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  { id: 'makanan',      labelKey: 'pcat_makanan' },
+  { id: 'transport',    labelKey: 'pcat_transport' },
+  { id: 'belanja',      labelKey: 'pcat_belanja' },
+  { id: 'hiburan',      labelKey: 'pcat_hiburan' },
+  { id: 'kesehatan',    labelKey: 'pcat_kesehatan' },
+  { id: 'pendidikan',   labelKey: 'pcat_pendidikan' },
+  { id: 'tabungan',     labelKey: 'pcat_tabungan' },
+  { id: 'gaji',         labelKey: 'pcat_gaji' },
+  { id: 'investasi',    labelKey: 'pcat_investasi' },
+  { id: 'utilitas',     labelKey: 'pcat_utilitas' },
+  { id: 'lainnya_prb',  labelKey: 'pcat_lainnya_prb' },
 ]
 
 const emptyForm = {
@@ -215,13 +210,13 @@ export default function PribadiPage() {
         setShowTxModal(false)
         invalidateCache('/api/personal')
         fetchData(true)
-        showMsg('success', editItem ? '✅ Catatan berhasil diperbarui!' : '✅ Transaksi berhasil dicatat!')
+        showMsg('success', editItem ? t('personal_tx_updated') : t('personal_tx_created'))
       } else {
         const d = await res.json()
-        showMsg('error', d.error || 'Terjadi kesalahan')
+        showMsg('error', d.error || t('generic_error'))
       }
     } catch {
-      showMsg('error', 'Terjadi kesalahan server')
+      showMsg('error', t('server_error'))
     }
     setTxLoading(false)
   }
@@ -247,13 +242,13 @@ export default function PribadiPage() {
         setShowBudgetModal(false)
         invalidateCache('/api/personal')
         fetchData(true)
-        showMsg('success', '💰 Saldo utama kas pribadi berhasil diatur!')
+        showMsg('success', t('personal_budget_saved'))
       } else {
         const d = await res.json()
-        showMsg('error', d.error || 'Gagal menyimpan saldo utama')
+        showMsg('error', d.error || t('personal_budget_save_error'))
       }
     } catch {
-      showMsg('error', 'Terjadi kesalahan')
+      showMsg('error', t('generic_error'))
     }
     setBudgetLoading(false)
   }
@@ -280,13 +275,13 @@ export default function PribadiPage() {
         setShowTopupModal(false)
         invalidateCache('/api/personal')
         fetchData(true)
-        showMsg('success', '➕ Saldo kas pribadi berhasil ditambah (Top-up)!')
+        showMsg('success', t('personal_topup_saved'))
       } else {
         const d = await res.json()
-        showMsg('error', d.error || 'Gagal menambah saldo')
+        showMsg('error', d.error || t('personal_topup_save_error'))
       }
     } catch {
-      showMsg('error', 'Terjadi kesalahan')
+      showMsg('error', t('generic_error'))
     }
     setTopupLoading(false)
   }
@@ -300,11 +295,18 @@ export default function PribadiPage() {
         setDeleteItem(null)
         invalidateCache('/api/personal')
         fetchData(true)
-        showMsg('success', '🗑️ Catatan berhasil dihapus!')
+        showMsg('success', t('personal_tx_deleted'))
       }
     } catch {}
     setDelLoading(false)
   }
+
+  const getPersonalCatLabel = (catId) => {
+    const found = PERSONAL_CATEGORIES.find(c => c.id === catId)
+    return found ? t(found.labelKey) : catId
+  }
+
+  const selectedMonthName = getMonthName(selectedMonth, language)
 
   const isCurrentMonth = selectedMonth === (now.getMonth() + 1) && selectedYear === now.getFullYear()
 
@@ -349,21 +351,21 @@ export default function PribadiPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Calendar size={17} style={{ color: 'var(--color-primary-500)' }} />
             <span style={{ fontWeight: 700, fontSize: '0.96rem', color: 'var(--text-primary)' }}>
-              {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+              {selectedMonthName} {selectedYear}
             </span>
             {!isCurrentMonth && (
               <button className="btn btn-ghost btn-sm" onClick={handleCurrentMonth} style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
-                Bulan Ini
+                {t('d_this_month')}
               </button>
             )}
           </div>
 
           <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-ghost btn-sm" onClick={handlePrevMonth} title="Bulan Sebelumnya">
-              <ChevronLeft size={15} /> Sebelumnya
+            <button className="btn btn-ghost btn-sm" onClick={handlePrevMonth} title={t('prev_month')}>
+              <ChevronLeft size={15} /> {t('prev_label')}
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={handleNextMonth} title="Bulan Berikutnya">
-              Berikutnya <ChevronRight size={15} />
+            <button className="btn btn-ghost btn-sm" onClick={handleNextMonth} title={t('next_month')}>
+              {t('next_label')} <ChevronRight size={15} />
             </button>
           </div>
         </div>
@@ -391,15 +393,15 @@ export default function PribadiPage() {
               </div>
               <div>
                 <div style={{ fontWeight: 650, fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: 2 }}>
-                  Saldo Utama Pribadi Belum Diatur
+                  {t('personal_no_budget_title')}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Tentukan modal kas pribadi bulan {MONTH_NAMES[selectedMonth - 1]} agar sisa saldo terpantau rapi.
+                  {t('personal_no_budget_desc').replace('{month}', selectedMonthName)}
                 </div>
               </div>
             </div>
             <button className="btn btn-primary btn-sm" onClick={openSetBudget}>
-              <Settings2 size={14} /> Atur Saldo Sekarang
+              <Settings2 size={14} /> {t('personal_set_balance_now')}
             </button>
           </div>
         )}
@@ -414,14 +416,14 @@ export default function PribadiPage() {
             </div>
             <div className="summary-card-value">{formatRupiah(summary.budgetAmount)}</div>
             <div className="summary-card-sub" style={{ justifyContent: 'space-between' }}>
-              <span>{summary.hasBudget ? 'Modal Kas Bulan Ini' : 'Belum diatur'}</span>
+              <span>{summary.hasBudget ? t('personal_modal_month') : t('personal_not_set')}</span>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
                 onClick={openTopup}
                 style={{ padding: '2px 8px', fontSize: '0.7rem' }}
               >
-                + Top-Up
+                {t('personal_topup_short')}
               </button>
             </div>
           </div>
@@ -434,7 +436,7 @@ export default function PribadiPage() {
             </div>
             <div className="summary-card-value" style={{ color: 'var(--color-danger)' }}>{formatRupiah(summary.totalExpense)}</div>
             <div className="summary-card-sub tabular-nums">
-              {summary.hasBudget ? `${summary.usagePercent}% dari saldo utama` : 'Total belanja bulan ini'}
+              {summary.hasBudget ? t('personal_of_main_balance').replace('{pct}', summary.usagePercent) : t('personal_total_spent_month')}
             </div>
           </div>
 
@@ -445,7 +447,7 @@ export default function PribadiPage() {
               <div className="summary-card-icon"><TrendingUp size={16} strokeWidth={1.85} /></div>
             </div>
             <div className="summary-card-value" style={{ color: 'var(--color-success)' }}>{formatRupiah(summary.totalIncome)}</div>
-            <div className="summary-card-sub">Top-up &amp; pemasukan tambahan</div>
+            <div className="summary-card-sub">{t('personal_topup_extra_sub')}</div>
           </div>
 
           {/* Card 4: Sisa Saldo Kas */}
@@ -465,7 +467,7 @@ export default function PribadiPage() {
                 />
               </div>
             ) : (
-              <div className="summary-card-sub">{summary.balance < 0 ? 'Defisit' : 'Saldo bersih bulan ini'}</div>
+              <div className="summary-card-sub">{summary.balance < 0 ? t('personal_deficit') : t('personal_net_balance_month')}</div>
             )}
           </div>
         </div>
@@ -481,9 +483,9 @@ export default function PribadiPage() {
                 onChange={e => { setFilterType(e.target.value); setPage(1) }}
                 style={{ flex: '1 1 130px', maxWidth: 180 }}
               >
-                <option value="">Semua Tipe</option>
-                <option value="expense">Pengeluaran Saja</option>
-                <option value="income">Pemasukan / Top-up Saja</option>
+                <option value="">{t('personal_all_types')}</option>
+                <option value="expense">{t('personal_expense_only')}</option>
+                <option value="income">{t('personal_income_only')}</option>
               </select>
 
               <select
@@ -492,9 +494,9 @@ export default function PribadiPage() {
                 onChange={e => { setFilterCategory(e.target.value); setPage(1) }}
                 style={{ flex: '1 1 160px', maxWidth: 220 }}
               >
-                <option value="">Semua Kategori</option>
+                <option value="">{t('all_categories')}</option>
                 {PERSONAL_CATEGORIES.map(c => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
+                  <option key={c.id} value={c.id}>{t(c.labelKey)}</option>
                 ))}
               </select>
 
@@ -504,13 +506,13 @@ export default function PribadiPage() {
                   onClick={() => { setFilterType(''); setFilterCategory(''); setPage(1) }}
                   style={{ color: 'var(--color-danger)' }}
                 >
-                  <X size={13} /> Reset Filter
+                  <X size={13} /> {t('personal_reset_filter')}
                 </button>
               )}
             </div>
 
             <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-              Total: {total} Transaksi
+              {t('personal_total_tx').replace('{count}', total)}
             </div>
           </div>
 
@@ -540,7 +542,7 @@ export default function PribadiPage() {
                     <tr>
                       <th style={{ whiteSpace: 'nowrap' }}>{t('date')}</th>
                       <th>{t('item_name')}</th>
-                      <th style={{ whiteSpace: 'nowrap' }}>Kategori</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>{t('category')}</th>
                       <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{t('amount')}</th>
                       <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{t('actions')}</th>
                     </tr>
@@ -560,7 +562,7 @@ export default function PribadiPage() {
                               display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0,
                             }}>
                               {item.type === 'income' ? <ArrowDownRight size={11} /> : <ArrowUpRight size={11} />}
-                              {item.type === 'income' ? 'Masuk' : 'Keluar'}
+                              {item.type === 'income' ? t('personal_in_badge') : t('personal_out_badge')}
                             </span>
                             <span>{item.itemName}</span>
                           </div>
@@ -573,7 +575,7 @@ export default function PribadiPage() {
                         <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}>
                             <CategoryIcon category={item.category} size={13} />
-                            {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+                            {getPersonalCatLabel(item.category)}
                           </span>
                         </td>
                         <td className="tabular-nums" style={{
@@ -587,7 +589,7 @@ export default function PribadiPage() {
                             <button
                               className="btn-icon"
                               onClick={() => openEditTx(item)}
-                              title="Edit"
+                              title={t('edit')}
                               style={{ flexShrink: 0, minWidth: 30, minHeight: 30 }}
                             >
                               <Edit2 size={14} />
@@ -595,7 +597,7 @@ export default function PribadiPage() {
                             <button
                               className="btn-icon"
                               onClick={() => setDeleteItem(item)}
-                              title="Hapus"
+                              title={t('delete')}
                               style={{ color: '#ef4444', flexShrink: 0, minWidth: 30, minHeight: 30 }}
                             >
                               <Trash2 size={14} />
@@ -621,7 +623,7 @@ export default function PribadiPage() {
                           display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0, marginTop: 1,
                         }}>
                           {item.type === 'income' ? <ArrowDownRight size={10} /> : <ArrowUpRight size={10} />}
-                          {item.type === 'income' ? 'Masuk' : 'Keluar'}
+                          {item.type === 'income' ? t('personal_in_badge') : t('personal_out_badge')}
                         </span>
                         <span>{item.itemName}</span>
                       </div>
@@ -637,7 +639,7 @@ export default function PribadiPage() {
                       <div className="tx-mobile-meta-left">
                         <span className="badge badge-gray" style={{ fontSize: '0.68rem', padding: '2px 7px' }}>
                           <CategoryIcon category={item.category} size={11} />
-                          {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+                          {getPersonalCatLabel(item.category)}
                         </span>
                         <span className="tx-mobile-date">{formatDateShort(item.date, language)}</span>
                       </div>
@@ -646,7 +648,7 @@ export default function PribadiPage() {
                           type="button"
                           className="btn-icon"
                           onClick={() => openEditTx(item)}
-                          title="Edit"
+                          title={t('edit')}
                           style={{ width: 30, height: 30 }}
                         >
                           <Edit2 size={14} />
@@ -655,7 +657,7 @@ export default function PribadiPage() {
                           type="button"
                           className="btn-icon"
                           onClick={() => setDeleteItem(item)}
-                          title="Hapus"
+                          title={t('delete')}
                           style={{ color: 'var(--color-danger)', width: 30, height: 30 }}
                         >
                           <Trash2 size={14} />
@@ -679,7 +681,10 @@ export default function PribadiPage() {
           {totalPages > 1 && (
             <div className="pagination">
               <span className="pagination-info">
-                Halaman {page} / {totalPages} ({total} catatan)
+                {t('personal_page_info')
+                  .replace('{page}', page)
+                  .replace('{totalPages}', totalPages)
+                  .replace('{total}', total)}
               </span>
               <div className="pagination-controls">
                 <button className="pagination-btn" onClick={() => setPage(p => p - 1)} disabled={page === 1}>
@@ -713,9 +718,9 @@ export default function PribadiPage() {
             <form onSubmit={handleSaveBudget}>
               <div className="modal-body" style={{ display: 'grid', gap: 16 }}>
                 <div style={{ background: 'var(--bg-tertiary)', borderRadius: 10, padding: '12px 16px', fontSize: '0.85rem' }}>
-                  <div style={{ color: 'var(--text-secondary)', marginBottom: 2 }}>Periode:</div>
+                  <div style={{ color: 'var(--text-secondary)', marginBottom: 2 }}>{t('personal_period_label')}</div>
                   <div style={{ fontWeight: 700, color: 'var(--color-primary-500)', fontSize: '0.95rem' }}>
-                    {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+                    {selectedMonthName} {selectedYear}
                   </div>
                 </div>
 
@@ -738,7 +743,7 @@ export default function PribadiPage() {
 
                 {/* Quick Presets */}
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>Pilihan Cepat:</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>{t('personal_quick_presets')}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {[1000000, 2000000, 3000000, 5000000, 10000000].map(val => (
                       <button
@@ -775,7 +780,7 @@ export default function PribadiPage() {
             <form onSubmit={handleSaveTopup}>
               <div className="modal-body" style={{ display: 'grid', gap: 16 }}>
                 <div style={{ background: 'var(--bg-tertiary)', borderRadius: 10, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Saldo Utama Saat Ini:</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('personal_current_main_balance')}</span>
                   <span style={{ fontWeight: 800, color: 'var(--color-primary-500)', fontSize: '1rem' }}>{formatRupiah(summary.budgetAmount)}</span>
                 </div>
 
@@ -798,7 +803,7 @@ export default function PribadiPage() {
 
                 {/* Quick Presets */}
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>Pilihan Cepat:</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>{t('personal_quick_presets')}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {[100000, 250000, 500000, 1000000, 2000000].map(val => (
                       <button
@@ -816,12 +821,12 @@ export default function PribadiPage() {
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">{t('notes')} (Opsional)</label>
+                  <label className="form-label">{t('notes')} {t('optional_label')}</label>
                   <input
                     type="text" className="form-input"
                     value={topupNotes}
                     onChange={e => setTopupNotes(e.target.value)}
-                    placeholder="Contoh: Transfer rekening, bonus tambahan..."
+                    placeholder={t('personal_topup_notes_placeholder')}
                   />
                 </div>
               </div>
@@ -829,7 +834,7 @@ export default function PribadiPage() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowTopupModal(false)}>{t('cancel')}</button>
                 <button type="submit" className="btn btn-primary" disabled={topupLoading}>
-                  {topupLoading ? <span className="btn-shimmer-dot" /> : <><Plus size={15} /> Tambah Saldo</>}
+                  {topupLoading ? <span className="btn-shimmer-dot" /> : <><Plus size={15} /> {t('personal_add_balance_btn')}</>}
                 </button>
               </div>
             </form>
@@ -843,7 +848,7 @@ export default function PribadiPage() {
           <div className="modal" style={{ maxWidth: 520 }}>
             <div className="modal-header">
               <h3 className="modal-title">
-                {editItem ? <><Edit2 size={16} /> {t('edit')} Catatan</> : <><Plus size={16} /> {t('personal_add')}</>}
+                {editItem ? <><Edit2 size={16} /> {t('personal_edit_record')}</> : <><Plus size={16} /> {t('personal_add')}</>}
               </h3>
               <button className="btn-icon" onClick={() => setShowTxModal(false)}><X size={16} /></button>
             </div>
@@ -856,10 +861,10 @@ export default function PribadiPage() {
                     <>
                       <div className="form-group" style={{ margin: 0 }}>
                         <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span>Tipe Transaksi</span>
+                          <span>{t('personal_tx_type')}</span>
                           {isEditingTopup && (
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <Lock size={11} /> Terkunci (Top-Up)
+                              <Lock size={11} /> {t('personal_locked_topup')}
                             </span>
                           )}
                         </label>
@@ -902,7 +907,7 @@ export default function PribadiPage() {
                           readOnly={isEditingTopup}
                           style={isEditingTopup ? { opacity: 0.72, cursor: 'not-allowed' } : {}}
                           onChange={e => !isEditingTopup && setTxForm(f => ({ ...f, itemName: e.target.value }))}
-                          placeholder="Contoh: Makan siang, Bensin, Gaji freelance..."
+                          placeholder={t('personal_item_placeholder')}
                         />
                       </div>
                     </>
@@ -929,7 +934,7 @@ export default function PribadiPage() {
 
                 {/* Kategori Visual Grid */}
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Kategori <span className="required">*</span></label>
+                  <label className="form-label">{t('category')} <span className="required">*</span></label>
                   <div className="category-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))' }}>
                     {PERSONAL_CATEGORIES.map(c => (
                       <button
@@ -941,7 +946,7 @@ export default function PribadiPage() {
                         <span className="category-grid-item-icon" style={{ width: 28, height: 28 }}>
                           <CategoryIcon category={c.id} size={15} />
                         </span>
-                        <span className="category-grid-item-label">{c.label}</span>
+                        <span className="category-grid-item-label">{t(c.labelKey)}</span>
                       </button>
                     ))}
                   </div>
@@ -964,7 +969,7 @@ export default function PribadiPage() {
                     className="form-textarea" rows={2}
                     value={txForm.notes}
                     onChange={e => setTxForm(f => ({ ...f, notes: e.target.value }))}
-                    placeholder="Catatan tambahan (opsional)..."
+                    placeholder={t('notes_placeholder')}
                   />
                 </div>
               </div>
@@ -985,7 +990,7 @@ export default function PribadiPage() {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 400 }}>
             <div className="modal-header">
-              <h3 className="modal-title"><Trash2 size={16} /> {t('delete')} Catatan</h3>
+              <h3 className="modal-title"><Trash2 size={16} /> {t('personal_delete_record')}</h3>
               <button className="btn-icon" onClick={() => setDeleteItem(null)}><X size={16} /></button>
             </div>
             <div className="modal-body">

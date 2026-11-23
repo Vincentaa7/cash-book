@@ -122,7 +122,7 @@ export default function DashboardPage() {
         <div className="page-header">
           <div>
             <h1>{t('dashboard')}</h1>
-            <p>Ringkasan arus kas &amp; anggaran periode {formatMonthYear(month, year, language)}</p>
+            <p>{t('dashboard_subtitle').replace('{period}', formatMonthYear(month, year, language))}</p>
           </div>
 
           {/* Month selector */}
@@ -231,7 +231,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="summary-card-sub tabular-nums">
                   {data?.summary?.totalBudget > 0
-                    ? `${Math.max(0, 100 - Math.min(100, pct))}% tersisa ${t('expense_ratio')}`
+                    ? t('pct_remaining').replace('{pct}', Math.max(0, 100 - Math.min(100, pct)))
                     : t('set_budget_first')}
                 </div>
               </div>
@@ -244,7 +244,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="summary-card-value">{formatRupiah(data?.summary?.avgPerDay || 0)}</div>
-                <div className="summary-card-sub">Per hari berjalan</div>
+                <div className="summary-card-sub">{t('per_elapsed_day')}</div>
               </div>
             </div>
 
@@ -255,7 +255,7 @@ export default function DashboardPage() {
                 <div className="card-header">
                   <h3 className="card-title">
                     <BarChart3 size={16} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
-                    {t('total_expense')} Harian — {formatMonthYear(month, year, language)}
+                    {t('daily_expense_chart').replace('{period}', formatMonthYear(month, year, language))}
                   </h3>
                 </div>
                 <div className="card-body">
@@ -288,7 +288,7 @@ export default function DashboardPage() {
                 <div className="card-header">
                   <h3 className="card-title">
                     <PieChartIcon size={16} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
-                    Distribusi {t('category')}
+                    {t('category_distribution')}
                   </h3>
                 </div>
                 <div className="card-body">
@@ -341,7 +341,7 @@ export default function DashboardPage() {
                 <div className="card-header">
                   <h3 className="card-title">
                     <TrendingUp size={16} strokeWidth={1.85} style={{ color: 'var(--color-primary-500)' }} />
-                    Tren 6 Bulan
+                    {t('six_month_trend')}
                   </h3>
                 </div>
                 <div className="card-body">
@@ -359,7 +359,7 @@ export default function DashboardPage() {
                         tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
                         axisLine={false}
                         tickLine={false}
-                        tickFormatter={v => `${(v / 1000000).toFixed(1)}jt`}
+                        tickFormatter={v => `${(v / 1000000).toFixed(1)}${t('amt_unit_m')}`}
                       />
                       <Tooltip content={<CustomTooltipLine />} />
                       <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2.2} dot={{ r: 3.5 }} activeDot={{ r: 5 }} name={t('total_expense')} />
@@ -460,7 +460,7 @@ export default function DashboardPage() {
                 <div className="empty-state">
                   <div className="empty-state-icon"><ReceiptText size={22} /></div>
                   <h3>{t('no_transactions')}</h3>
-                  <p>Belum ada transaksi tercatat pada periode ini.</p>
+                  <p>{t('no_transactions_period')}</p>
                   <Link href="/transaksi/baru" className="btn btn-primary" style={{ marginTop: 16 }}>
                     <Plus size={16} /> {t('add_expense')}
                   </Link>

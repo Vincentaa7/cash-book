@@ -157,17 +157,21 @@ export default function AiChatWidget() {
   
   const messagesEndRef = useRef(null)
 
-  // Inisialisasi percakapan pertama kali
+  // Inisialisasi & sinkronisasi pesan sambutan saat bahasa berubah
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          role: 'assistant',
-          content: t('ai_welcome') || 'Halo! Saya asisten keuangan keluarga Anda. Ada yang bisa saya bantu analisis hari ini?'
-        }
-      ])
-    }
-  }, [t, messages.length])
+    const welcome = t('ai_welcome')
+    setMessages(prev => {
+      if (prev.length === 0) {
+        return [{ role: 'assistant', content: welcome, isWelcome: true }]
+      }
+      if (prev.length >= 1 && prev[0]?.isWelcome && prev[0].content !== welcome) {
+        const next = [...prev]
+        next[0] = { ...next[0], content: welcome }
+        return next
+      }
+      return prev
+    })
+  }, [t])
 
   // Scroll otomatis ke bawah saat ada pesan baru
   useEffect(() => {
@@ -263,8 +267,8 @@ export default function AiChatWidget() {
         <button 
           className="ai-chat-bubble-btn"
           onClick={() => setIsOpen(true)}
-          title={t('ai_assistant') || 'Asisten AI Keuangan'}
-          aria-label="Buka Chat AI Asisten"
+          title={t('ai_assistant')}
+          aria-label={t('open_ai_chat')}
         >
           <Bot size={22} strokeWidth={1.9} />
         </button>
@@ -290,7 +294,7 @@ export default function AiChatWidget() {
             <button 
               className="ai-chat-close-btn"
               onClick={() => setIsOpen(false)}
-              aria-label="Tutup Chat"
+              aria-label={t('close_ai_chat')}
             >
               <X size={17} />
             </button>
@@ -369,7 +373,7 @@ export default function AiChatWidget() {
               type="submit" 
               className="ai-chat-send-btn" 
               disabled={isLoading || !inputValue.trim()}
-              title="Kirim"
+              title={t('send_label')}
             >
               <Send size={16} />
             </button>
