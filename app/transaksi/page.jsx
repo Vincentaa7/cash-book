@@ -8,7 +8,7 @@ import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
 import { TableSkeleton } from '@/components/Skeleton'
 import { useToast } from '@/components/ToastContext'
-import { formatRupiah, formatDate, formatDateInput, formatTime, formatMemberName } from '@/lib/format'
+import { formatRupiah, formatDate, formatDateShort, formatDateInput, formatTime, formatMemberName } from '@/lib/format'
 import { CATEGORIES, getInitials } from '@/lib/constants'
 import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
 import { Search, Download, Edit2, Trash2, X, ChevronLeft, ChevronRight, Plus, Inbox, Check, FileText, Pencil } from 'lucide-react'
@@ -353,23 +353,132 @@ export default function TransaksiPage() {
               <p>Ubah filter pencarian atau tambahkan catatan pengeluaran baru.</p>
             </div>
           ) : (
-            <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th className="sortable" onClick={() => handleSort('transactionDate')} style={{ width: '18%' }}>
+            <>
+              {/* Desktop Table View */}
+              <div className="table-container desktop-table-only" style={{ border: 'none', borderRadius: 0 }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th className="sortable" onClick={() => handleSort('transactionDate')} style={{ whiteSpace: 'nowrap' }}>
+                        {t('date')} {sortBy === 'transactionDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th>{t('item_name')}</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>{t('category')}</th>
+                      <th className="sortable" onClick={() => handleSort('amount')} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {t('amount')} {sortBy === 'amount' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th style={{ whiteSpace: 'nowrap' }}>{t('member_name')}</th>
+                      <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{t('actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map(tx => {
+                      const isOwner = tx.memberId === user?.id
+                      const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
+                      const within24h = (Date.now() - new Date(tx.createdAt).getTime()) < 86400000
+                      const canEdit = isAdmin || (isOwner && within24h)
+                      const canDelete = isAdmin
+
+                      return (
+                        <tr key={tx.id}>
+                          <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                            {formatDate(tx.transactionDate, language)}
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 550 }}>{tx.itemName}</div>
+                            {tx.notes && (
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <FileText size={11} style={{ flexShrink: 0 }} /> {tx.notes}
+                              </div>
+                            )}
+                            {tx.updatedAt && tx.editedByName && (
+                              <div style={{
+                                fontSize: '0.68rem',
+                                color: 'var(--color-warning)',
+                                marginTop: 4,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                flexWrap: 'wrap',
+                              }}>
+                                <Pencil size={10} /> <span style={{ fontWeight: 600 }} title={tx.editedByName}>{t('last_edited')}: {formatMemberName(tx.editedByName)}</span>
+                                <span style={{ opacity: 0.7 }}>·</span>
+                                <span style={{ opacity: 0.85 }}>{formatDate(tx.updatedAt, language)} {formatTime(tx.updatedAt, language)}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}><CategoryBadge category={tx.category} size="sm" /></td>
+                          <td className="tabular-nums" style={{ fontWeight: 650, color: tx.category === 'pemasukan' ? 'var(--color-success)' : 'var(--color-danger)', textAlign: 'right', fontSize: '0.855rem', whiteSpace: 'nowrap' }}>
+                            {tx.category === 'pemasukan' ? '+' : '-'}{formatRupiah(tx.amount)}
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{
+                                width: 28, height: 28, borderRadius: '50%',
+                                background: tx.member?.avatarColor || '#0d9488',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: 'white', fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
+                              }}>
+                                {getInitials(tx.member?.name || '?')}
+                              </div>
+                              <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }} title={tx.member?.name || '-'}>
+                                {formatMemberName(tx.member?.name)}
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ textAlign: 'center', padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' }}>
+                              {canEdit && (
+                                <button
+                                  className="btn-icon"
+                                  onClick={() => openEdit(tx)}
+                                  title="Edit"
+                                  style={{ flexShrink: 0, minWidth: 28, minHeight: 28 }}
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button
+                                  className="btn-icon"
+                                  onClick={() => setDeleteTx(tx)}
+                                  title="Hapus"
+                                  style={{ color: '#ef4444', flexShrink: 0, minWidth: 28, minHeight: 28 }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Fintech Ledger List (Zero Clipped Text & Zero Wrapped Numbers) */}
+              <div className="mobile-ledger-only">
+                <div className="tx-mobile-sortbar">
+                  <span>Urutkan:</span>
+                  <div className="tx-mobile-sort-actions">
+                    <button
+                      type="button"
+                      className={`tx-mobile-sort-btn ${sortBy === 'transactionDate' ? 'active' : ''}`}
+                      onClick={() => handleSort('transactionDate')}
+                    >
                       {t('date')} {sortBy === 'transactionDate' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
-                    </th>
-                    <th style={{ width: '37%' }}>{t('item_name')}</th>
-                    <th className="hide-on-mobile" style={{ width: '15%' }}>{t('category')}</th>
-                    <th className="sortable" onClick={() => handleSort('amount')} style={{ width: '25%', textAlign: 'right' }}>
+                    </button>
+                    <button
+                      type="button"
+                      className={`tx-mobile-sort-btn ${sortBy === 'amount' ? 'active' : ''}`}
+                      onClick={() => handleSort('amount')}
+                    >
                       {t('amount')} {sortBy === 'amount' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
-                    </th>
-                    <th className="hide-on-mobile" style={{ width: '15%' }}>{t('member_name')}</th>
-                    <th style={{ width: '20%', textAlign: 'center' }}>{t('actions')}</th>
-                  </tr>
-                </thead>
-                <tbody>
+                    </button>
+                  </div>
+                </div>
+                <div className="tx-mobile-list">
                   {transactions.map(tx => {
                     const isOwner = tx.memberId === user?.id
                     const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
@@ -378,85 +487,80 @@ export default function TransaksiPage() {
                     const canDelete = isAdmin
 
                     return (
-                      <tr key={tx.id}>
-                        <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>
-                          {formatDate(tx.transactionDate, language)}
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 500 }}>{tx.itemName}</div>
-                          <div className="show-on-mobile" style={{ fontSize: '0.75rem', marginTop: 2 }}>
-                            <CategoryBadge category={tx.category} size="xs" />
+                      <div key={tx.id} className="tx-mobile-row">
+                        <div className="tx-mobile-top">
+                          <div className="tx-mobile-title">{tx.itemName}</div>
+                          <div
+                            className="tx-mobile-amount"
+                            style={{ color: tx.category === 'pemasukan' ? 'var(--color-success)' : 'var(--color-danger)' }}
+                          >
+                            {tx.category === 'pemasukan' ? '+' : '-'}{formatRupiah(tx.amount)}
                           </div>
-                          {tx.notes && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <FileText size={11} /> {tx.notes}
+                        </div>
+
+                        <div className="tx-mobile-meta">
+                          <div className="tx-mobile-meta-left">
+                            <CategoryBadge category={tx.category} size="xs" />
+                            <span className="tx-mobile-date">{formatDateShort(tx.transactionDate, language)}</span>
+                            {tx.member?.name && (
+                              <span className="tx-mobile-member" title={tx.member.name}>
+                                · {formatMemberName(tx.member.name)}
+                              </span>
+                            )}
+                          </div>
+                          {(canEdit || canDelete) && (
+                            <div className="tx-mobile-actions">
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  className="btn-icon"
+                                  onClick={() => openEdit(tx)}
+                                  title="Edit"
+                                  style={{ width: 30, height: 30 }}
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  className="btn-icon"
+                                  onClick={() => setDeleteTx(tx)}
+                                  title="Hapus"
+                                  style={{ color: 'var(--color-danger)', width: 30, height: 30 }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
                             </div>
                           )}
-                          {tx.updatedAt && tx.editedByName && (
-                            <div style={{
-                              fontSize: '0.68rem',
-                              color: 'var(--color-warning)',
-                              marginTop: 4,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              flexWrap: 'wrap',
-                            }}>
-                              <Pencil size={10} /> <span style={{ fontWeight: 600 }} title={tx.editedByName}>{t('last_edited')}: {formatMemberName(tx.editedByName)}</span>
-                              <span style={{ opacity: 0.7 }}>·</span>
-                              <span style={{ opacity: 0.85 }}>{formatDate(tx.updatedAt, language)} {formatTime(tx.updatedAt, language)}</span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="hide-on-mobile"><CategoryBadge category={tx.category} size="sm" /></td>
-                        <td className="tabular-nums" style={{ fontWeight: 650, color: tx.category === 'pemasukan' ? 'var(--color-success)' : 'var(--color-danger)', textAlign: 'right', fontSize: '0.855rem' }}>
-                          {tx.category === 'pemasukan' ? '+' : '-'}{formatRupiah(tx.amount)}
-                        </td>
-                        <td className="hide-on-mobile">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{
-                              width: 28, height: 28, borderRadius: '50%',
-                              background: tx.member?.avatarColor || '#0d9488',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: 'white', fontSize: '0.65rem', fontWeight: 700, flexShrink: 0,
-                            }}>
-                              {getInitials(tx.member?.name || '?')}
-                            </div>
-                            <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }} title={tx.member?.name || '-'}>
-                              {formatMemberName(tx.member?.name)}
+                        </div>
+
+                        {tx.notes && (
+                          <div className="tx-mobile-note">
+                            <FileText size={11} style={{ flexShrink: 0, marginTop: 2 }} />
+                            <span>{tx.notes}</span>
+                          </div>
+                        )}
+
+                        {tx.updatedAt && tx.editedByName && (
+                          <div className="tx-mobile-edited">
+                            <Pencil size={10} style={{ flexShrink: 0 }} />
+                            <span style={{ fontWeight: 600 }} title={tx.editedByName}>
+                              {t('last_edited')}: {formatMemberName(tx.editedByName)}
+                            </span>
+                            <span style={{ opacity: 0.7 }}>·</span>
+                            <span style={{ opacity: 0.85 }}>
+                              {formatDateShort(tx.updatedAt, language)} {formatTime(tx.updatedAt, language)}
                             </span>
                           </div>
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '8px 4px' }}>
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' }}>
-                            {canEdit && (
-                              <button
-                                className="btn-icon"
-                                onClick={() => openEdit(tx)}
-                                title="Edit"
-                                style={{ flexShrink: 0, minWidth: 28, minHeight: 28 }}
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                            )}
-                            {canDelete && (
-                              <button
-                                className="btn-icon"
-                                onClick={() => setDeleteTx(tx)}
-                                title="Hapus"
-                                style={{ color: '#ef4444', flexShrink: 0, minWidth: 28, minHeight: 28 }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                        )}
+                      </div>
                     )
                   })}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </div>
+            </>
           )}
 
           {/* Pagination */}

@@ -9,7 +9,7 @@ import CategoryBadge from '@/components/CategoryBadge'
 import CategoryIcon from '@/components/CategoryIcon'
 import { LaporanSkeleton } from '@/components/Skeleton'
 import { useToast } from '@/components/ToastContext'
-import { formatRupiah, formatDate, formatMonthYear, calcPercentage, formatNumber, formatMemberName } from '@/lib/format'
+import { formatRupiah, formatDate, formatDateShort, formatMonthYear, calcPercentage, formatNumber, formatMemberName } from '@/lib/format'
 import { CATEGORIES, getCategoryInfo } from '@/lib/constants'
 import { cachedFetch, peekCache } from '@/lib/clientCache'
 import {
@@ -775,12 +775,12 @@ export default function LaporanPage() {
                         const pct = calcPercentage(amount, totalExpense)
                         return (
                           <div key={cat}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, fontSize: '0.84rem' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: 'var(--text-primary)', fontWeight: 500 }}>
-                                <CategoryIcon category={info.id} size={14} style={{ color: info.color }} />
-                                {t(info.labelKey)}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 5, fontSize: '0.84rem' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, color: 'var(--text-primary)', fontWeight: 500, minWidth: 0 }}>
+                                <CategoryIcon category={info.id} size={14} style={{ color: info.color, flexShrink: 0 }} />
+                                <span style={{ overflowWrap: 'break-word' }}>{t(info.labelKey)}</span>
                               </span>
-                              <span className="tabular-nums" style={{ fontWeight: 650 }}>{formatRupiah(amount)} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({pct}%)</span></span>
+                              <span className="tabular-nums" style={{ fontWeight: 650, whiteSpace: 'nowrap', flexShrink: 0 }}>{formatRupiah(amount)} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({pct}%)</span></span>
                             </div>
                             <div className="progress-bar" style={{ marginTop: 0 }}>
                               <div
@@ -878,24 +878,24 @@ export default function LaporanPage() {
                 </div>
                 <div className="card-body">
                   {/* Summary cards: bulan ini vs bulan lalu vs rata-rata */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
-                    <div style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, borderLeft: '4px solid var(--color-primary-500)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+                    <div className="metric-tile" style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, border: '1px solid var(--border-color)', borderLeft: '4px solid var(--color-primary-500)' }}>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Bulan Ini</div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--color-primary-600)' }}>{formatRupiah(compareData.current?.amount || 0)}</div>
+                      <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '0.98rem', color: 'var(--color-primary-600)', whiteSpace: 'nowrap' }}>{formatRupiah(compareData.current?.amount || 0)}</div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                         {formatMonthYear(compareData.current?.month, compareData.current?.year, language)}
                       </div>
                     </div>
-                    <div style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, borderLeft: '4px solid #64748b' }}>
+                    <div className="metric-tile" style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, border: '1px solid var(--border-color)', borderLeft: '4px solid #64748b' }}>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Bulan Lalu</div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#64748b' }}>{formatRupiah(compareData.previous?.amount || 0)}</div>
+                      <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '0.98rem', color: '#64748b', whiteSpace: 'nowrap' }}>{formatRupiah(compareData.previous?.amount || 0)}</div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                         {formatMonthYear(compareData.previous?.month, compareData.previous?.year, language)}
                       </div>
                     </div>
-                    <div style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, borderLeft: '4px solid #f59e0b' }}>
+                    <div className="metric-tile" style={{ padding: '12px 14px', background: 'var(--bg-tertiary)', borderRadius: 12, border: '1px solid var(--border-color)', borderLeft: '4px solid #f59e0b' }}>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>Rata-rata 3 Bln</div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#d97706' }}>{formatRupiah(compareData.avg3Months || 0)}</div>
+                      <div className="tabular-nums" style={{ fontWeight: 800, fontSize: '0.98rem', color: '#d97706', whiteSpace: 'nowrap' }}>{formatRupiah(compareData.avg3Months || 0)}</div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>per bulan</div>
                     </div>
                   </div>
@@ -959,47 +959,88 @@ export default function LaporanPage() {
                   <p>Tidak ada transaksi pada rentang filter yang dipilih.</p>
                 </div>
               ) : (
-                <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>{t('date')}</th>
-                        <th>{t('item_name')}</th>
-                        <th className="hide-on-mobile">{t('category')}</th>
-                        <th>{t('amount')}</th>
-                        <th className="hide-on-mobile">{t('member_name')}</th>
-                        <th className="hide-on-mobile">{t('notes')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transactions.map(t => (
-                        <tr key={t.id}>
-                          <td style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{formatDate(t.transactionDate, language)}</td>
-                          <td style={{ fontWeight: 500 }}>
-                            {t.itemName}
-                            <div className="show-on-mobile" style={{ fontSize: '0.75rem', marginTop: 2 }}>
-                              <CategoryBadge category={t.category} size="xs" />
-                            </div>
-                          </td>
-                          <td className="hide-on-mobile"><CategoryBadge category={t.category} size="sm" /></td>
-                          <td style={{ fontWeight: 700, color: t.category === 'pemasukan' ? 'var(--color-success)' : '#ef4444', whiteSpace: 'nowrap' }}>{formatRupiah(t.amount)}</td>
-                          <td className="hide-on-mobile" style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }} title={t.member?.name || '-'}>
-                            {formatMemberName(t.member?.name)}
-                          </td>
-                          <td className="hide-on-mobile" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.notes || '-'}</td>
+                <>
+                  {/* Desktop Table View */}
+                  <div className="table-container desktop-table-only" style={{ border: 'none', borderRadius: 0 }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th style={{ whiteSpace: 'nowrap' }}>{t('date')}</th>
+                          <th>{t('item_name')}</th>
+                          <th style={{ whiteSpace: 'nowrap' }}>{t('category')}</th>
+                          <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{t('amount')}</th>
+                          <th style={{ whiteSpace: 'nowrap' }}>{t('member_name')}</th>
+                          <th>{t('notes')}</th>
                         </tr>
+                      </thead>
+                      <tbody>
+                        {transactions.map(tx => (
+                          <tr key={tx.id}>
+                            <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{formatDate(tx.transactionDate, language)}</td>
+                            <td style={{ fontWeight: 550 }}>{tx.itemName}</td>
+                            <td style={{ whiteSpace: 'nowrap' }}><CategoryBadge category={tx.category} size="sm" /></td>
+                            <td className="tabular-nums" style={{ fontWeight: 700, textAlign: 'right', color: tx.category === 'pemasukan' ? 'var(--color-success)' : 'var(--color-danger)', whiteSpace: 'nowrap' }}>
+                              {tx.category === 'pemasukan' ? '+' : '-'}{formatRupiah(tx.amount)}
+                            </td>
+                            <td style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }} title={tx.member?.name || '-'}>
+                              {formatMemberName(tx.member?.name)}
+                            </td>
+                            <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{tx.notes || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={3} style={{ fontWeight: 700, padding: '12px 16px' }}>{t('total').toUpperCase()}</td>
+                          <td className="tabular-nums" style={{ fontWeight: 800, textAlign: 'right', color: 'var(--color-danger)', fontSize: '0.98rem', padding: '12px 16px', whiteSpace: 'nowrap' }}>{formatRupiah(totalExpense)}</td>
+                          <td colSpan={2} />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Mobile Fintech Ledger List */}
+                  <div className="mobile-ledger-only">
+                    <div className="tx-mobile-list">
+                      {transactions.map(tx => (
+                        <div key={tx.id} className="tx-mobile-row">
+                          <div className="tx-mobile-top">
+                            <div className="tx-mobile-title">{tx.itemName}</div>
+                            <div
+                              className="tx-mobile-amount"
+                              style={{ color: tx.category === 'pemasukan' ? 'var(--color-success)' : 'var(--color-danger)' }}
+                            >
+                              {tx.category === 'pemasukan' ? '+' : '-'}{formatRupiah(tx.amount)}
+                            </div>
+                          </div>
+                          <div className="tx-mobile-meta">
+                            <div className="tx-mobile-meta-left">
+                              <CategoryBadge category={tx.category} size="xs" />
+                              <span className="tx-mobile-date">{formatDateShort(tx.transactionDate, language)}</span>
+                              {tx.member?.name && (
+                                <span className="tx-mobile-member" title={tx.member.name}>
+                                  · {formatMemberName(tx.member.name)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {tx.notes && (
+                            <div className="tx-mobile-note">
+                              <FileText size={11} style={{ flexShrink: 0, marginTop: 2 }} />
+                              <span>{tx.notes}</span>
+                            </div>
+                          )}
+                        </div>
                       ))}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td className="hide-on-mobile" />
-                        <td colSpan={2} style={{ fontWeight: 700, padding: '12px 16px' }}>{t('total').toUpperCase()}</td>
-                        <td style={{ fontWeight: 800, color: '#ef4444', fontSize: '1rem', padding: '12px 16px' }}>{formatRupiah(totalExpense)}</td>
-                        <td className="hide-on-mobile" colSpan={2} />
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
+                    </div>
+                    <div className="tx-mobile-footer-total">
+                      <span style={{ fontSize: '0.82rem', letterSpacing: '0.04em', color: 'var(--text-secondary)' }}>{t('total').toUpperCase()}</span>
+                      <span className="tabular-nums" style={{ fontSize: '0.98rem', color: 'var(--color-danger)', whiteSpace: 'nowrap' }}>
+                        {formatRupiah(totalExpense)}
+                      </span>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </>

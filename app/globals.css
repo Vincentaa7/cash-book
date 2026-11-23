@@ -563,41 +563,32 @@ img { max-width: 100%; display: block; }
   transition: transform 0.22s var(--ease-out), box-shadow 0.22s var(--ease-out), border-color 0.2s ease;
 }
 
-.reminder-banner:hover,
-.reminder-banner:active {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-color: rgba(16, 185, 129, 0.45);
+@media (hover: hover) {
+  .reminder-banner:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: rgba(16, 185, 129, 0.45);
+  }
+}
+
+@media (hover: none) {
+  .reminder-banner:active:not(:has(button:active)) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: rgba(16, 185, 129, 0.45);
+  }
 }
 
 /* ============================================================
-   Cards & Clean Fintech KPI Surfaces (Micro-Interaction #2: Lift on Hover & Touch)
+   Section Containers (.card) — Always Stable & Grounded
+   (NO lift / shrink when clicking inputs, categories, or tables inside)
 ============================================================ */
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-sm);
-  transition: transform 0.24s var(--ease-out), box-shadow 0.24s var(--ease-out), border-color 0.22s ease;
-}
-
-.card:hover {
-  transform: translateY(-3px);
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-lg);
-}
-
-/* Mobile Touch Lift: subtle elevation when touched on phones */
-@media (hover: none) {
-  .card:hover {
-    transform: none;
-    box-shadow: var(--shadow-sm);
-  }
-  .card:active {
-    transform: translateY(-2px) scale(1.003);
-    border-color: var(--border-hover);
-    box-shadow: var(--shadow-md);
-  }
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card-body {
@@ -635,7 +626,10 @@ img { max-width: 100%; display: block; }
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* Monochrome Clean Fintech Summary Card (NO Rainbow Gradients!) */
+/* ============================================================
+   Discrete Fintech KPI Cards & Metric Tiles
+   (Micro-Interaction #2: Subtle Lift on Cursor Hover & Mobile Touch)
+============================================================ */
 .summary-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -651,19 +645,23 @@ img { max-width: 100%; display: block; }
   transition: transform 0.24s var(--ease-out), box-shadow 0.24s var(--ease-out), border-color 0.22s ease;
 }
 
-.summary-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-lg);
+.metric-tile {
+  transition: transform 0.22s var(--ease-out), box-shadow 0.22s var(--ease-out), border-color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .summary-card:hover,
+  .metric-tile:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-lg);
+  }
 }
 
 @media (hover: none) {
-  .summary-card:hover {
-    transform: none;
-    box-shadow: var(--shadow-sm);
-  }
-  .summary-card:active {
-    transform: translateY(-2.5px) scale(1.006);
+  .summary-card:active:not(:has(button:active, a:active)),
+  .metric-tile:active {
+    transform: translateY(-2px);
     border-color: rgba(20, 184, 166, 0.35);
     box-shadow: var(--shadow-md), 0 0 0 1px rgba(20, 184, 166, 0.14);
   }
@@ -756,7 +754,8 @@ img { max-width: 100%; display: block; }
   line-height: 1.2;
   letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .summary-card-sub {
@@ -1450,11 +1449,13 @@ img { max-width: 100%; display: block; }
   background: var(--bg-tertiary);
 }
 
-.category-grid-item:hover {
-  border-color: var(--color-primary-500);
-  color: var(--text-primary);
-  transform: translateY(-2px);
-  box-shadow: var(--glow-subtle);
+@media (hover: hover) {
+  .category-grid-item:hover {
+    border-color: var(--color-primary-500);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow: var(--glow-subtle);
+  }
 }
 
 .category-grid-item:active {
@@ -1576,10 +1577,12 @@ img { max-width: 100%; display: block; }
   transition: transform 0.18s var(--ease-out), box-shadow 0.22s var(--ease-out), background-color 0.2s ease;
 }
 
-.ai-chat-bubble-btn:hover {
-  background: var(--color-primary-700);
-  transform: translateY(-2px);
-  box-shadow: var(--glow-primary);
+@media (hover: hover) {
+  .ai-chat-bubble-btn:hover {
+    background: var(--color-primary-700);
+    transform: translateY(-2px);
+    box-shadow: var(--glow-primary);
+  }
 }
 
 .ai-chat-bubble-btn:active {
@@ -1941,11 +1944,20 @@ img { max-width: 100%; display: block; }
   box-sizing: border-box;
 }
 
-.activity-log-card:hover,
-.activity-log-card:active {
-  transform: translateY(-2px);
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-md);
+@media (hover: hover) {
+  .activity-log-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+@media (hover: none) {
+  .activity-log-card:active {
+    transform: translateY(-2px);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-md);
+  }
 }
 
 .activity-log-card-header {
@@ -2107,6 +2119,179 @@ img { max-width: 100%; display: block; }
 
 .hide-on-mobile { display: table-cell; }
 .show-on-mobile { display: none; }
+.desktop-table-only { display: block; }
+.mobile-ledger-only { display: none; }
+
+/* ============================================================
+   Mobile Fintech Ledger List (Zero Clipping, Zero Wrapped Numbers)
+============================================================ */
+.tx-mobile-sortbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.tx-mobile-sort-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tx-mobile-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.14s var(--ease-out), border-color 0.18s ease, color 0.18s ease, box-shadow 0.2s ease, background-color 0.18s ease;
+}
+
+.tx-mobile-sort-btn.active {
+  border-color: rgba(13, 148, 136, 0.45);
+  background: var(--color-primary-hover);
+  color: var(--color-primary-600);
+}
+
+[data-theme="dark"] .tx-mobile-sort-btn.active {
+  color: var(--color-primary-300);
+}
+
+.tx-mobile-sort-btn:active {
+  transform: scale(0.95);
+  box-shadow: var(--glow-subtle);
+}
+
+.tx-mobile-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.tx-mobile-row {
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transition: background-color 0.15s ease;
+}
+
+.tx-mobile-row:last-child {
+  border-bottom: none;
+}
+
+.tx-mobile-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tx-mobile-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.tx-mobile-amount {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+}
+
+.tx-mobile-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tx-mobile-meta-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.tx-mobile-date {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-mobile-member {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.tx-mobile-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.tx-mobile-note {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+.tx-mobile-edited {
+  font-size: 0.69rem;
+  color: var(--color-warning);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  line-height: 1.35;
+}
+
+.tx-mobile-footer-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  font-weight: 700;
+}
 
 @media (max-width: 1080px) {
   .summary-grid {
@@ -2149,7 +2334,7 @@ img { max-width: 100%; display: block; }
   .filter-row { flex-direction: column; gap: 8px; }
   .search-input-wrapper { min-width: 100%; }
 
-  .table th, .table td { padding: 10px 8px; }
+  .table th, .table td { padding: 10px 10px; }
   .table td { font-size: 0.83rem; }
   .table-container {
     border-radius: 0;
@@ -2158,15 +2343,29 @@ img { max-width: 100%; display: block; }
     border-left: none;
     border-right: none;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  .table { table-layout: fixed; width: 100%; }
-  .table td, .table th { overflow: hidden; text-overflow: ellipsis; word-break: break-word; }
-  .table td > div { min-width: 0; overflow: hidden; }
-  .table th:first-child, .table td:first-child { padding-left: 12px !important; }
-  .table th:last-child, .table td:last-child { padding-right: 12px !important; }
+  .table { table-layout: auto; width: 100%; }
+  .table th:first-child, .table td:first-child { padding-left: 14px !important; }
+  .table th:last-child, .table td:last-child { padding-right: 14px !important; }
+
+  .cat-badge {
+    white-space: normal;
+    line-height: 1.25;
+    max-width: 100%;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px;
+    justify-content: center;
+  }
 
   .hide-on-mobile { display: none !important; }
   .show-on-mobile { display: block !important; }
+  .desktop-table-only { display: none !important; }
+  .mobile-ledger-only { display: block !important; }
 
   .ai-chat-widget { right: 14px; bottom: 80px; }
   .ai-chat-window { width: calc(100vw - 28px); height: 420px; max-height: calc(100vh - 160px); }
@@ -2366,10 +2565,12 @@ button, a, .nav-link, .bottom-nav-item, .settings-tab-btn, .category-grid-item {
   background: var(--bg-tertiary);
 }
 
-.frequent-template-chip:hover {
-  border-color: var(--color-primary-500);
-  box-shadow: var(--glow-subtle);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .frequent-template-chip:hover {
+    border-color: var(--color-primary-500);
+    box-shadow: var(--glow-subtle);
+    transform: translateY(-1px);
+  }
 }
 
 .frequent-template-chip:active {

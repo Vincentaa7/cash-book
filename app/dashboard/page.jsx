@@ -6,7 +6,7 @@ import AppShell from '@/components/AppShell'
 import { useLanguage } from '@/components/LanguageContext'
 import CategoryBadge from '@/components/CategoryBadge'
 import { DashboardSkeleton } from '@/components/Skeleton'
-import { formatRupiah, formatDate, formatMonthYear, getMonthName, getBudgetStatusColor, formatMemberName, MONTH_NAMES } from '@/lib/format'
+import { formatRupiah, formatDate, formatDateShort, formatMonthYear, getMonthName, getBudgetStatusColor, formatMemberName, MONTH_NAMES } from '@/lib/format'
 import { getCategoryInfo } from '@/lib/constants'
 import { cachedFetch, peekCache, setCache } from '@/lib/clientCache'
 import {
@@ -382,54 +382,80 @@ export default function DashboardPage() {
                 </Link>
               </div>
               {data?.recentTransactions?.length > 0 ? (
-                <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>{t('item_name')}</th>
-                        <th className="hide-on-mobile">{t('category')}</th>
-                        <th style={{ textAlign: 'right' }}>{t('amount')}</th>
-                        <th className="hide-on-mobile">{t('date')}</th>
-                        <th className="hide-on-mobile">{t('member_name')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.recentTransactions.map(tx => (
-                        <tr key={tx.id}>
-                          <td style={{ fontWeight: 550 }}>
-                            {tx.itemName}
-                            <div className="show-on-mobile" style={{ fontSize: '0.74rem', marginTop: 2, color: 'var(--text-muted)' }}>
-                              {formatDate(tx.transactionDate, language)}
-                            </div>
-                          </td>
-                          <td className="hide-on-mobile"><CategoryBadge category={tx.category} size="sm" /></td>
-                          <td className="tabular-nums" style={{ fontWeight: 650, textAlign: 'right', color: tx.category === 'pemasukan' ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                            {tx.category === 'pemasukan' ? '+' : '-'}{formatRupiah(tx.amount)}
-                          </td>
-                          <td className="hide-on-mobile" style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>{formatDate(tx.transactionDate, language)}</td>
-                          <td className="hide-on-mobile">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div
-                                style={{
-                                  width: 24, height: 24,
-                                  borderRadius: '50%',
-                                  background: tx.member?.avatarColor || '#0d9488',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  color: 'white', fontSize: '0.62rem', fontWeight: 700, flexShrink: 0,
-                                }}
-                              >
-                                {tx.member?.name?.slice(0, 2).toUpperCase() || '??'}
-                              </div>
-                              <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }} title={tx.member?.name || '-'}>
-                                {formatMemberName(tx.member?.name)}
-                              </span>
-                            </div>
-                          </td>
+                <>
+                  {/* Desktop Table View */}
+                  <div className="table-container desktop-table-only" style={{ border: 'none', borderRadius: 0 }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>{t('item_name')}</th>
+                          <th style={{ whiteSpace: 'nowrap' }}>{t('category')}</th>
+                          <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{t('amount')}</th>
+                          <th style={{ whiteSpace: 'nowrap' }}>{t('date')}</th>
+                          <th style={{ whiteSpace: 'nowrap' }}>{t('member_name')}</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {data.recentTransactions.map(tx => (
+                          <tr key={tx.id}>
+                            <td style={{ fontWeight: 550 }}>{tx.itemName}</td>
+                            <td style={{ whiteSpace: 'nowrap' }}><CategoryBadge category={tx.category} size="sm" /></td>
+                            <td className="tabular-nums" style={{ fontWeight: 650, textAlign: 'right', whiteSpace: 'nowrap', color: tx.category === 'pemasukan' ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                              {tx.category === 'pemasukan' ? '+' : '-'}{formatRupiah(tx.amount)}
+                            </td>
+                            <td style={{ color: 'var(--text-secondary)', fontSize: '0.84rem', whiteSpace: 'nowrap' }}>{formatDate(tx.transactionDate, language)}</td>
+                            <td style={{ whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div
+                                  style={{
+                                    width: 24, height: 24,
+                                    borderRadius: '50%',
+                                    background: tx.member?.avatarColor || '#0d9488',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    color: 'white', fontSize: '0.62rem', fontWeight: 700, flexShrink: 0,
+                                  }}
+                                >
+                                  {tx.member?.name?.slice(0, 2).toUpperCase() || '??'}
+                                </div>
+                                <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }} title={tx.member?.name || '-'}>
+                                  {formatMemberName(tx.member?.name)}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Fintech Ledger List */}
+                  <div className="mobile-ledger-only tx-mobile-list">
+                    {data.recentTransactions.map(tx => (
+                      <div key={tx.id} className="tx-mobile-row">
+                        <div className="tx-mobile-top">
+                          <div className="tx-mobile-title">{tx.itemName}</div>
+                          <div
+                            className="tx-mobile-amount"
+                            style={{ color: tx.category === 'pemasukan' ? 'var(--color-success)' : 'var(--color-danger)' }}
+                          >
+                            {tx.category === 'pemasukan' ? '+' : '-'}{formatRupiah(tx.amount)}
+                          </div>
+                        </div>
+                        <div className="tx-mobile-meta">
+                          <div className="tx-mobile-meta-left">
+                            <CategoryBadge category={tx.category} size="xs" />
+                            <span className="tx-mobile-date">{formatDateShort(tx.transactionDate, language)}</span>
+                            {tx.member?.name && (
+                              <span className="tx-mobile-member" title={tx.member.name}>
+                                · {formatMemberName(tx.member.name)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="empty-state">
                   <div className="empty-state-icon"><ReceiptText size={22} /></div>

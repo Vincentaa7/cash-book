@@ -320,19 +320,21 @@ export default function CalendarPage() {
                           style={{
                             padding: '10px 12px',
                             background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
                             borderRadius: 10,
                             borderLeft: `4px solid ${isIncome ? 'var(--color-success)' : info.color}`,
                             fontSize: '0.8rem',
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center'
+                            alignItems: 'flex-start',
+                            gap: 10,
                           }}
                         >
-                          <div>
-                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{tx.itemName}</div>
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', overflowWrap: 'break-word' }}>{tx.itemName}</div>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 4, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                <CategoryIcon category={info.id} size={11} style={{ color: info.color }} />
+                                <CategoryIcon category={info.id} size={11} style={{ color: info.color, flexShrink: 0 }} />
                                 {t(info.labelKey)}
                               </span>
                               <span>·</span>
@@ -346,7 +348,7 @@ export default function CalendarPage() {
                               </div>
                             )}
                           </div>
-                          <div style={{ fontWeight: 700, color: isIncome ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                          <div className="tabular-nums" style={{ fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, color: isIncome ? 'var(--color-success)' : 'var(--color-danger)' }}>
                             {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
                           </div>
                         </div>
@@ -458,10 +460,17 @@ export default function CalendarPage() {
           color: #fecaca;
         }
 
-        .calendar-day-cell:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-          border-color: var(--color-primary-400) !important;
+        @media (hover: hover) {
+          .calendar-day-cell:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border-color: var(--color-primary-400) !important;
+          }
+        }
+
+        .calendar-day-cell:active {
+          transform: scale(0.96);
+          box-shadow: var(--glow-subtle);
         }
 
         .cal-day-expense-label {

@@ -20,7 +20,7 @@ export default function CategoryBadge({ category, size = 'normal' }) {
 
   return (
     <span className="cat-badge" style={style}>
-      <CategoryIcon category={info.id} size={iconSize} />
+      <CategoryIcon category={info.id} size={iconSize} style={{ flexShrink: 0 }} />
       <span>{t(info.labelKey)}</span>
     </span>
   )

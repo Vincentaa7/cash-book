@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import AppShell from '@/components/AppShell'
 import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
-import { formatRupiah, formatNumber, formatDate, formatDateInput } from '@/lib/format'
+import { formatRupiah, formatNumber, formatDate, formatDateShort, formatDateInput } from '@/lib/format'
 import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
 import CategoryIcon from '@/components/CategoryIcon'
 import { TableSkeleton } from '@/components/Skeleton'
@@ -532,82 +532,147 @@ export default function PribadiPage() {
               </div>
             </div>
           ) : (
-            <div className="table-container" style={{ border: 'none', borderRadius: 0 }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '16%' }}>{t('date')}</th>
-                    <th style={{ width: '34%' }}>{t('item_name')}</th>
-                    <th className="hide-on-mobile" style={{ width: '18%' }}>Kategori</th>
-                    <th style={{ width: '20%', textAlign: 'right' }}>{t('amount')}</th>
-                    <th style={{ width: '20%', textAlign: 'center' }}>{t('actions')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map(item => (
-                    <tr key={item.id}>
-                      <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        {formatDate(item.date, language)}
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{
-                            fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 99,
-                            background: item.type === 'income' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
-                            color: item.type === 'income' ? '#10b981' : '#ef4444',
-                            display: 'inline-flex', alignItems: 'center', gap: 2
-                          }}>
-                            {item.type === 'income' ? <ArrowDownRight size={11} /> : <ArrowUpRight size={11} />}
-                            {item.type === 'income' ? 'Masuk' : 'Keluar'}
-                          </span>
-                          <span>{item.itemName}</span>
-                        </div>
-                        {item.notes && (
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <FileText size={11} /> {item.notes}
+            <>
+              {/* Desktop Table View */}
+              <div className="table-container desktop-table-only" style={{ border: 'none', borderRadius: 0 }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ whiteSpace: 'nowrap' }}>{t('date')}</th>
+                      <th>{t('item_name')}</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>Kategori</th>
+                      <th style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{t('amount')}</th>
+                      <th style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{t('actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map(item => (
+                      <tr key={item.id}>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                          {formatDate(item.date, language)}
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 550, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{
+                              fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 99,
+                              background: item.type === 'income' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
+                              color: item.type === 'income' ? '#10b981' : '#ef4444',
+                              display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0,
+                            }}>
+                              {item.type === 'income' ? <ArrowDownRight size={11} /> : <ArrowUpRight size={11} />}
+                              {item.type === 'income' ? 'Masuk' : 'Keluar'}
+                            </span>
+                            <span>{item.itemName}</span>
                           </div>
-                        )}
-                        <div className="show-on-mobile" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                          {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
-                        </div>
-                      </td>
-                      <td className="hide-on-mobile" style={{ fontSize: '0.82rem' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}>
-                          <CategoryIcon category={item.category} size={13} />
+                          {item.notes && (
+                            <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: 3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <FileText size={11} style={{ flexShrink: 0 }} /> {item.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}>
+                            <CategoryIcon category={item.category} size={13} />
+                            {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+                          </span>
+                        </td>
+                        <td className="tabular-nums" style={{
+                          textAlign: 'right', fontWeight: 700, fontSize: '0.855rem', whiteSpace: 'nowrap',
+                          color: item.type === 'income' ? 'var(--color-success)' : 'var(--color-danger)',
+                        }}>
+                          {item.type === 'income' ? '+' : '-'}{formatRupiah(item.amount)}
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' }}>
+                            <button
+                              className="btn-icon"
+                              onClick={() => openEditTx(item)}
+                              title="Edit"
+                              style={{ flexShrink: 0, minWidth: 30, minHeight: 30 }}
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              className="btn-icon"
+                              onClick={() => setDeleteItem(item)}
+                              title="Hapus"
+                              style={{ color: '#ef4444', flexShrink: 0, minWidth: 30, minHeight: 30 }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Fintech Ledger List */}
+              <div className="mobile-ledger-only tx-mobile-list">
+                {items.map(item => (
+                  <div key={item.id} className="tx-mobile-row">
+                    <div className="tx-mobile-top">
+                      <div className="tx-mobile-title" style={{ display: 'flex', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontSize: '0.64rem', fontWeight: 700, padding: '2px 6px', borderRadius: 99,
+                          background: item.type === 'income' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)',
+                          color: item.type === 'income' ? '#10b981' : '#ef4444',
+                          display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0, marginTop: 1,
+                        }}>
+                          {item.type === 'income' ? <ArrowDownRight size={10} /> : <ArrowUpRight size={10} />}
+                          {item.type === 'income' ? 'Masuk' : 'Keluar'}
+                        </span>
+                        <span>{item.itemName}</span>
+                      </div>
+                      <div
+                        className="tx-mobile-amount"
+                        style={{ color: item.type === 'income' ? 'var(--color-success)' : 'var(--color-danger)' }}
+                      >
+                        {item.type === 'income' ? '+' : '-'}{formatRupiah(item.amount)}
+                      </div>
+                    </div>
+
+                    <div className="tx-mobile-meta">
+                      <div className="tx-mobile-meta-left">
+                        <span className="badge badge-gray" style={{ fontSize: '0.68rem', padding: '2px 7px' }}>
+                          <CategoryIcon category={item.category} size={11} />
                           {PERSONAL_CATEGORIES.find(c => c.id === item.category)?.label || item.category}
                         </span>
-                      </td>
-                      <td style={{
-                        textAlign: 'right', fontWeight: 700, fontSize: '0.85rem',
-                        color: item.type === 'income' ? 'var(--color-success)' : '#ef4444',
-                      }}>
-                        {item.type === 'income' ? '+' : '-'}{formatRupiah(item.amount)}
-                      </td>
-                      <td style={{ textAlign: 'center', padding: '8px 4px' }}>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' }}>
-                          <button
-                            className="btn-icon"
-                            onClick={() => openEditTx(item)}
-                            title="Edit"
-                            style={{ flexShrink: 0, minWidth: 30, minHeight: 30 }}
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                          <button
-                            className="btn-icon"
-                            onClick={() => setDeleteItem(item)}
-                            title="Hapus"
-                            style={{ color: '#ef4444', flexShrink: 0, minWidth: 30, minHeight: 30 }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <span className="tx-mobile-date">{formatDateShort(item.date, language)}</span>
+                      </div>
+                      <div className="tx-mobile-actions">
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          onClick={() => openEditTx(item)}
+                          title="Edit"
+                          style={{ width: 30, height: 30 }}
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          onClick={() => setDeleteItem(item)}
+                          title="Hapus"
+                          style={{ color: 'var(--color-danger)', width: 30, height: 30 }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {item.notes && (
+                      <div className="tx-mobile-note">
+                        <FileText size={11} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span>{item.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
 
           {/* Pagination */}

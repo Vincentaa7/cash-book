@@ -7,7 +7,7 @@ import { useUser } from '@/components/UserContext'
 import { useLanguage } from '@/components/LanguageContext'
 import { SettingsBlockSkeleton, TableSkeleton } from '@/components/Skeleton'
 import { useToast } from '@/components/ToastContext'
-import { formatNumber, formatDate, formatTime, formatMemberName } from '@/lib/format'
+import { formatNumber, formatDate, formatDateShort, formatTime, formatMemberName } from '@/lib/format'
 import { AVATAR_COLORS } from '@/lib/constants'
 import { cachedFetch, peekCache, invalidateCache } from '@/lib/clientCache'
 import {
@@ -675,10 +675,10 @@ function PengaturanContent() {
                     <table className="table">
                       <thead>
                         <tr>
-                          <th>{t('member_name')}</th>
-                          <th className="hide-on-mobile">{t('member_role')}</th>
-                          <th className="hide-on-mobile">{t('member_status')}</th>
-                          <th>{t('actions')}</th>
+                          <th style={{ width: '100%' }}>{t('member_name')}</th>
+                          <th className="hide-on-mobile" style={{ whiteSpace: 'nowrap' }}>{t('member_role')}</th>
+                          <th className="hide-on-mobile" style={{ whiteSpace: 'nowrap' }}>{t('member_status')}</th>
+                          <th style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{t('actions')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -690,11 +690,11 @@ function PengaturanContent() {
                                   {m.name.substring(0,2).toUpperCase()}
                                 </div>
                                 <div style={{ minWidth: 0, flex: 1 }}>
-                                  <span style={{ fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }} title={m.name}>
+                                  <span style={{ fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={m.name}>
                                     {formatMemberName(m.name)}
                                   </span>
                                   {m.name.includes('@') && (
-                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                       {m.name}
                                     </span>
                                   )}
@@ -702,7 +702,7 @@ function PengaturanContent() {
                                 </div>
                               </div>
                             </td>
-                            <td className="hide-on-mobile">
+                            <td className="hide-on-mobile" style={{ whiteSpace: 'nowrap' }}>
                                {m.role === 'superadmin' ?
                                 <span className="badge" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', color: 'white', display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content' }}><Shield size={12}/> Super Admin</span> :
                                 m.role === 'admin' ? 
@@ -710,11 +710,11 @@ function PengaturanContent() {
                                 <span className="badge badge-blue">{t('member_role')}</span>
                                }
                             </td>
-                            <td className="hide-on-mobile">
+                            <td className="hide-on-mobile" style={{ whiteSpace: 'nowrap' }}>
                               {m.isActive ? <span className="text-success text-sm font-medium">{t('active')}</span> : <span className="text-danger text-sm font-medium">{t('inactive')}</span>}
                             </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: 6 }}>
+                            <td style={{ whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                                 {/* Admin/Superadmin dapat edit anggota non-superadmin, dan setiap user (termasuk member) dapat edit profilnya sendiri */}
                                 {((isAdminOrSuper && m.role !== 'superadmin') || m.id === user.id) && (
                                   <button className="btn-icon" onClick={() => openEditMember(m)} title="Edit"><Edit2 size={16}/></button>
@@ -1031,7 +1031,7 @@ function PengaturanContent() {
                                 </span>
                               </div>
                               <div className="activity-log-card-time">
-                                {formatDate(log.createdAt, language)} {formatTime(log.createdAt, language)}
+                                {formatDateShort(log.createdAt, language)} {formatTime(log.createdAt, language)}
                               </div>
                             </div>
                             <div className="activity-log-card-body">
